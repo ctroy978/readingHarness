@@ -99,7 +99,10 @@ Rules:
 - The JSON `lesson_id`, when present, must equal the filename without `.json`.
 - Set schema-v2 `meta.status` to `published`; `draft` files are rejected.
 - Place only published lessons in the lesson directory.
-- `/start?skill=vocab&level=1` opens the lowest sequence at that category and level.
+- `/start?star=1000-1099&skill=vocab` opens the configured starting lesson for that Star band and
+  category.
+- `/start?skill=vocab&level=1` remains a direct diagnostic route and opens the lowest sequence at
+  that category and level.
 - An AI exit line names the exact destination lesson, so multiple lessons at one level are safe.
 
 The unsigned exit line format is:
