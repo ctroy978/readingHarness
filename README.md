@@ -134,6 +134,10 @@ tickets, so adding another file at the same level never changes the onboarding e
 lesson type list comes from `categories.json`, so a new category appears without changing the
 page template.
 
+The current Star bands use stable placeholder IDs such as `vocab_L1000_0001`. Replace the contents
+of those lesson files when the real starting lesson is ready; the filename and onboarding mapping
+can stay the same.
+
 ## Deploy
 
 ### Render

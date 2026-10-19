@@ -1,9 +1,74 @@
 {
   "star_rows": [
-    {"key": "900-999", "label": "900-999", "entries": {}},
-    {"key": "1000-1099", "label": "1000-1099", "entries": {"inference": "inference_L5_0001", "process": "process_L9_0001"}},
-    {"key": "1100-1199", "label": "1100-1199", "entries": {}},
-    {"key": "1200-1299", "label": "1200-1299", "entries": {}},
-    {"key": "1300-1400", "label": "1300-1400", "entries": {}}
+    {
+      "key": "900-999",
+      "label": "900-999",
+      "entries": {
+        "vocab": "vocab_L900_0001",
+        "main_idea": "main_idea_L900_0001",
+        "inference": "inference_L900_0001",
+        "process": "process_L900_0001",
+        "text_structure": "text_structure_L900_0001",
+        "literary_text": "literary_text_L900_0001",
+        "authors_craft": "authors_craft_L900_0001",
+        "argument_evidence": "argument_evidence_L900_0001"
+      }
+    },
+    {
+      "key": "1000-1099",
+      "label": "1000-1099",
+      "entries": {
+        "vocab": "vocab_L1000_0001",
+        "main_idea": "main_idea_L1000_0001",
+        "inference": "inference_L5_0001",
+        "process": "process_L9_0001",
+        "text_structure": "text_structure_L1000_0001",
+        "literary_text": "literary_text_L1000_0001",
+        "authors_craft": "authors_craft_L1000_0001",
+        "argument_evidence": "argument_evidence_L1000_0001"
+      }
+    },
+    {
+      "key": "1100-1199",
+      "label": "1100-1199",
+      "entries": {
+        "vocab": "vocab_L1100_0001",
+        "main_idea": "main_idea_L1100_0001",
+        "inference": "inference_L1100_0001",
+        "process": "process_L1100_0001",
+        "text_structure": "text_structure_L1100_0001",
+        "literary_text": "literary_text_L1100_0001",
+        "authors_craft": "authors_craft_L1100_0001",
+        "argument_evidence": "argument_evidence_L1100_0001"
+      }
+    },
+    {
+      "key": "1200-1299",
+      "label": "1200-1299",
+      "entries": {
+        "vocab": "vocab_L1200_0001",
+        "main_idea": "main_idea_L1200_0001",
+        "inference": "inference_L1200_0001",
+        "process": "process_L1200_0001",
+        "text_structure": "text_structure_L1200_0001",
+        "literary_text": "literary_text_L1200_0001",
+        "authors_craft": "authors_craft_L1200_0001",
+        "argument_evidence": "argument_evidence_L1200_0001"
+      }
+    },
+    {
+      "key": "1300-1400",
+      "label": "1300-1400",
+      "entries": {
+        "vocab": "vocab_L1300_0001",
+        "main_idea": "main_idea_L1300_0001",
+        "inference": "inference_L1300_0001",
+        "process": "process_L1300_0001",
+        "text_structure": "text_structure_L1300_0001",
+        "literary_text": "literary_text_L1300_0001",
+        "authors_craft": "authors_craft_L1300_0001",
+        "argument_evidence": "argument_evidence_L1300_0001"
+      }
+    }
   ]
 }
