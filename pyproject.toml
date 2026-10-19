@@ -1,0 +1,19 @@
+[project]
+name = "reading-harness-server"
+version = "0.1.0"
+description = "Stateless lesson distribution server for reading harnesses"
+requires-python = ">=3.11"
+dependencies = [
+  "starlette>=0.40,<0.49",
+  "uvicorn>=0.30",
+]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.27",
+  "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

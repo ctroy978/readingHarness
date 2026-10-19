@@ -1,0 +1,6 @@
+{
+  "star_rows": [
+    {"label": "300-499", "entries": {"inference": 5}},
+    {"label": "500 and above", "entries": {"inference": 5, "process": 9}}
+  ]
+}

@@ -9,8 +9,8 @@ the JSON contract that connects them.
 When a lesson conflicts with this document, change the lesson or explicitly version an
 exception in `meta.authoring_exceptions`. Do not leave a silent exception.
 
-The two current POCs use the legacy `schema_version: 1` shape. New lessons use the canonical
-`schema_version: 2` shape in section 9. Do not quietly mix the two shapes in one file.
+The two current test lessons use the legacy `schema_version: 1` shape. New lessons use the
+canonical `schema_version: 2` shape in section 9. Do not quietly mix the two shapes in one file.
 
 ## 1. Non-negotiable product contract
 
@@ -107,7 +107,7 @@ One lesson should:
 - include enough variation to make at least one difficulty decision meaningful;
 - reach a clean stop instead of continuing indefinitely.
 
-The current POCs are smaller. Five items are acceptable for a prototype, but not as the
+The current test lessons are smaller. Five items are acceptable for a prototype, but not as the
 default size for a bank lesson. Record prototype scope as
 `meta.session.scope: "prototype"` or `"bank"`.
 
@@ -387,11 +387,16 @@ Define at minimum:
 Recommended defaults:
 
 - correct: record the result and move to the next item;
-- incorrect: step down within the lesson or re-serve the skill;
-- two consecutive misses on a skill: drop to a prerequisite item;
+- incorrect: stay on the current item and use its authored help ladder;
+- repeated misses on one item: follow the authored help limit, then use `tell` and say-back;
+- do not switch items or replace the lesson mid-session because of a miss;
 - mastery: advance only after the authored evidence threshold, not after one success;
 - mercy: does not count as `got_there` unless the lesson explicitly says otherwise;
 - open: move on without trapping the student.
+
+A miss changes what the tutor does within the current item, not which item or lesson the
+student receives next. After `tell` and say-back, record `mercy` or `open` and advance. Choose
+the next lesson only at exit through the authored route table.
 
 The route table is ordered. The first matching route wins. Do not depend on a numeric sort
 that is not stated.
@@ -431,6 +436,10 @@ Score in this order:
 6. If incorrect or blank: use the authored help ladder.
 7. After the help limit: give `tell`, then require say-back.
 8. Record `mercy` or `open` according to the say-back outcome, then advance.
+
+A miss must never skip, replace, or repeat an item mid-session. The current item's authored
+misconception branch, help ladder, `tell`, and say-back are the complete response to a wrong
+answer. Route changes happen only after the final item, through `exit_rules`.
 
 Do not ask the model to decide whether an answer is "close enough" without a stored set or
 rubric.

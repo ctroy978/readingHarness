@@ -1,0 +1,6 @@
+{
+  "categories": [
+    {"key": "inference", "label": "Inference", "order": 10},
+    {"key": "process", "label": "Process", "order": 20}
+  ]
+}

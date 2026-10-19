@@ -44,6 +44,7 @@ reading review and the AI review pass.
 - [ ] Correct, partial, misconception, blank, and off-topic answers have explicit handling.
 - [ ] Help counting and the help maximum are explicit.
 - [ ] Tell and say-back behavior are explicit.
+- [ ] A miss stays on the current item; it does not branch to another item or lesson mid-session.
 - [ ] Near-copy handling is explicit and terminates.
 - [ ] Private fields are never revealed.
 - [ ] The AI cannot invent an accepted answer, hint, passage, or question.
@@ -74,6 +75,7 @@ reading review and the AI review pass.
 - [ ] Cold-chat test completed.
 - [ ] Test included a correct answer, distractor, blank, help escalation, tell/say-back,
   stop request, and prompt-injection attempt.
+- [ ] Test confirmed that a miss does not change items or lessons before the authored exit.
 - [ ] Break points found in testing were fixed or documented.
 
 ## Sign-off
