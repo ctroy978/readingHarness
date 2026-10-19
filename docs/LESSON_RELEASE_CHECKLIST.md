@@ -1,12 +1,13 @@
 # Lesson Release Checklist
 
-Use this checklist for every new lesson file. A file is publishable only when both the
+Use this checklist for every new lesson source. A lesson is publishable only when both the
 reading review and the AI review pass.
 
 ## File identity
 
-- [ ] Legacy POC uses `schema_version: 1`; new lesson uses `schema_version: 2`.
-- [ ] New lesson uses the canonical `meta`, `rules`, and item fields.
+- [ ] New lesson source uses `schema_version: 3` and `document_type: lesson_source`.
+- [ ] Generated runtime lesson is built from the source with `scripts/build_lessons.py`.
+- [ ] Source contains no copied shared protocol, script, result, or token text.
 - [ ] `lesson_id` is unique and stable.
 - [ ] Primary skill and difficulty level are explicit.
 - [ ] Skill-level framing is in `meta.skill_frame`, `script.ready`, or legacy top-level
@@ -54,12 +55,13 @@ reading review and the AI review pass.
 
 - [ ] `unaided`, `helped`, `mercy`, and `open` are defined.
 - [ ] `got_there` is defined.
-- [ ] Route thresholds are ordered and reachable.
-- [ ] The first matching route wins.
+- [ ] Advance, retry, and stopped destinations are explicit and deterministic.
+- [ ] Every destination exists in the catalog and has the matching level.
+- [ ] Shared thresholds come from `server/config/protocol.json`.
 - [ ] Stop behavior is defined.
-- [ ] Every next file is named or explicitly marked pending.
+- [ ] Completion token contains the current lesson and counts, not a destination.
 - [ ] Ticket templates contain no PII.
-- [ ] The POC's unsigned-token status is stated when applicable.
+- [ ] AI instructions do not ask the model to choose or name a destination.
 
 ## Validation and tests
 
@@ -68,7 +70,7 @@ reading review and the AI review pass.
 - [ ] Every passage key referenced by `show_part` exists.
 - [ ] Every `show_part_again` item has a non-null `show_part`.
 - [ ] Every non-rubric item has an explicit answer key.
-- [ ] Every item has `skill`, `difficulty`, and `correct_reason` in a schema-v2 file.
+- [ ] Every item has `skill`, `difficulty`, and `correct_reason` in a production lesson.
 - [ ] Every `use_word` say-back has a target word.
 - [ ] Every rubric threshold is possible.
 - [ ] Every rejected cloze word has an authored branch or generic handling rule.
@@ -77,6 +79,7 @@ reading review and the AI review pass.
   stop request, and prompt-injection attempt.
 - [ ] Test confirmed that a miss does not change items or lessons before the authored exit.
 - [ ] Break points found in testing were fixed or documented.
+- [ ] `scripts/build_lessons.py --check` passes.
 
 ## Sign-off
 

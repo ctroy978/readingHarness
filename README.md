@@ -97,22 +97,55 @@ Rules:
 - Use a configured category key for `<category>`.
 - Levels and sequences are positive integers and sort numerically. There is no fixed maximum.
 - The JSON `lesson_id`, when present, must equal the filename without `.json`.
-- Set schema-v2 `meta.status` to `published`; `draft` files are rejected.
+- Set `meta.status` to `published`; `draft` runtime files are rejected.
 - Place only published lessons in the lesson directory.
 - `/start?star=1000-1099&skill=vocab` opens the configured starting lesson for that Star band and
   category.
-- `/start?skill=vocab&level=1` remains a direct diagnostic route and opens the lowest sequence at
-  that category and level.
-- An AI exit line names the exact destination lesson, so multiple lessons at one level are safe.
+- `/start?skill=vocab&level=1` is rejected. Later lessons are reachable only through a
+  server-selected, signed next-lesson link.
+- An AI exit line reports the current lesson and outcome counts. It does not name a destination.
 
 The unsigned exit line format is:
 
 ```text
-v0|skill=vocab|level=1|lesson=vocab_L1_0002
+v1|from=vocab_L1_0001|done=5|got_there=4
 ```
 
-The AI prints that line. The student pastes it at `/finish`, which returns a signed `/next` URL.
-The 3-day clock starts when the server signs the line.
+The AI prints that line. The student pastes it at `/finish`. The server looks up the current
+lesson's route policy, chooses `advance` or `retry`, and returns a signed `/next` URL containing
+the destination and `available_at`. The 3-day clock is set by the server when it signs the line.
+The link cannot be edited to change either the destination or the unlock time.
+
+This is a pacing gate, not a tamper-proof one-lesson-per-student enforcement system. Without
+server state, a student can still start another progression or copy a link. The server stores no
+student identifier, progress record, cookie, or database.
+
+## Build lesson JSON
+
+Authored lesson sources use `schema_version: 3` with `document_type: "lesson_source"`. The shared
+tutor protocol, common scripts, result definitions, route thresholds, and completion-token format
+live in `server/config/protocol.json`. A source lesson contains only its metadata, passage, items,
+script overrides, and three route destinations.
+
+Compile sources into ordinary self-contained runtime lesson JSON:
+
+```bash
+uv run python scripts/build_lessons.py \
+  --source-dir /path/to/lesson-repo/lessons/src \
+  --output-dir /path/to/lesson-repo/lessons
+```
+
+Check that committed generated files match their sources:
+
+```bash
+uv run python scripts/build_lessons.py \
+  --source-dir /path/to/lesson-repo/lessons/src \
+  --output-dir /path/to/lesson-repo/lessons \
+  --check
+```
+
+Changing a shared rule or the mastery threshold is a change to `protocol.json` followed by a
+rebuild. Do not copy shared protocol text into individual lesson sources.
 
 ## Add or change Star entry levels
 

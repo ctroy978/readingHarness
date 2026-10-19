@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import re
 import tarfile
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import MappingProxyType
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import pytest
 
@@ -57,14 +58,14 @@ def config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             }
         )
     )
-    for name in [
-        "vocab_L1_0001.json",
-        "inference_L1_0009.json",
-        "inference_L1_0010.json",
-        "inference_L2_0010.json",
-    ]:
+    lesson_ids = ["vocab_L1_0001"] + [
+        f"inference_L{level}_{sequence:04d}"
+        for level in (1, 2)
+        for sequence in range(1, 12)
+    ]
+    for name in [f"{lesson_id}.json" for lesson_id in lesson_ids]:
         (lesson_dir / name).write_text(
-            json.dumps({"lesson_id": name.removesuffix(".json"), "schema_version": 1})
+            json.dumps(_lesson_data(name.removesuffix(".json")))
         )
     monkeypatch.setenv("TICKET_SECRET", "x" * 32)
     monkeypatch.delenv("GITHUB_REPO", raising=False)
@@ -77,6 +78,39 @@ def config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 @pytest.fixture
 def client(config):
     return AsgiClient(create_app(config))
+
+
+def _lesson_data(lesson_id: str) -> dict:
+    match = re.fullmatch(r"(?P<skill>[a-z][a-z0-9_-]*)_L(?P<level>\d+)_(?P<sequence>\d+)", lesson_id)
+    assert match is not None
+    level = int(match["level"])
+    sequence = int(match["sequence"])
+    return {
+        "schema_version": 3,
+        "document_type": "reading_lesson",
+        "lesson_id": lesson_id,
+        "meta": {"status": "published", "skill": lesson_id.split("_L")[0]},
+        "script": {},
+        "passage": {},
+        "items": [{"id": "q1"}],
+        "rules": {
+            "server_routes": {
+                "advance": {
+                    "next_file": lesson_id,
+                    "next_level": level,
+                },
+                "retry": {
+                    "next_file": (
+                        "inference_L1_0010"
+                        if level == 1 and sequence == 9
+                        else lesson_id
+                    ),
+                    "next_level": level,
+                },
+                "stopped": {"next_file": lesson_id, "next_level": level},
+            }
+        },
+    }
 
 
 class Response:
@@ -176,10 +210,13 @@ def test_star_entry_does_not_depend_on_sequence_order(
     lessons["inference_L1_9999.json"] = json.dumps(
         {"lesson_id": "inference_L1_9999", "schema_version": 1}
     ).encode()
-    new_lessons, _ = build_catalog(lessons, {"vocab", "inference", "process"})
+    new_lessons, _, new_policies = build_catalog(
+        lessons, {"vocab", "inference", "process"}
+    )
     replacement = replace(
         config,
         lessons=MappingProxyType(new_lessons),
+        policies=MappingProxyType(new_policies),
         lesson_bytes=MappingProxyType(lessons),
     )
     response = AsgiClient(create_app(replacement)).get("/start?star=300-499&skill=inference")
@@ -196,9 +233,7 @@ def test_unavailable_star_and_type_combination(client):
 
 def test_start_uses_lowest_numeric_sequence(client):
     response = client.get("/start?skill=inference&level=1")
-    assert response.status_code == 200
-    assert "inference_L1_0009.json" in response.headers["content-disposition"]
-    assert response.status_code != 204
+    assert response.status_code == 400
 
 
 def test_invalid_start_is_400(client):
@@ -206,14 +241,74 @@ def test_invalid_start_is_400(client):
     assert client.get("/start?skill=vocab&level=nope").status_code == 400
 
 
+def test_server_selects_advance_destination(client):
+    response = client.post(
+        "/sign", json={"line": "v1|from=inference_L1_0009|done=1|got_there=1"}
+    )
+    assert response.status_code == 200
+    url = response.json()["url"]
+    assert "inference_L1_0010" in unquote(url)
+
+
+def test_server_selects_retry_destination(client):
+    response = client.post(
+        "/sign", json={"line": "v1|from=inference_L1_0009|done=1|got_there=0"}
+    )
+    assert response.status_code == 200
+    assert "inference_L1_0010" in response.json()["url"]
+
+
+def test_server_selects_stopped_destination_immediately(client):
+    response = client.post(
+        "/sign",
+        json={"line": "v1|from=inference_L1_0009|done=1|got_there=0|stop=1"},
+    )
+    assert response.status_code == 200
+    url = response.json()["url"]
+    assert "inference_L1_0009" in url
+    assert client.get(url).headers["content-disposition"].endswith(
+        'filename="inference_L1_0009.json"'
+    )
+
+
+def test_completion_line_cannot_name_a_destination(client):
+    response = client.post(
+        "/sign",
+        json={"line": "v1|from=inference_L1_0009|done=1|got_there=1|lesson=inference_L2_0010"},
+    )
+    assert response.status_code == 400
+
+
+def test_completion_counts_are_bounded(client):
+    for line in (
+        "v1|from=inference_L1_0009|done=2|got_there=2",
+        "v1|from=inference_L1_0009|done=1|got_there=2",
+        "v1|from=inference_L1_0009|done=-1|got_there=0",
+    ):
+        assert client.post("/sign", json={"line": line}).status_code == 400
+
+
+def test_signed_link_contains_server_available_time(client):
+    response = client.post(
+        "/sign", json={"line": "v1|from=inference_L1_0010|done=1|got_there=1"}
+    )
+    assert response.status_code == 200
+    ticket = unquote(urlsplit(response.json()["url"]).query.removeprefix("t="))
+    assert "available=" in ticket
+
+
 def test_sign_and_pacing(client, config):
-    line = "v0|skill=vocab|level=1|lesson=vocab_L1_0001"
+    line = "v1|from=vocab_L1_0001|done=1|got_there=1"
     response = client.post("/sign", json={"line": line})
     assert response.status_code == 200
     assert response.json()["url"].startswith("https://example.test/next?t=")
 
     fresh = Lesson("vocab", 1, 1, "vocab_L1_0001.json")
-    fresh_url = "/next?t=" + make_ticket(fresh, config.secret)
+    fresh_url = "/next?t=" + make_ticket(
+        fresh,
+        config.secret,
+        available_at=datetime.now(timezone.utc) + timedelta(days=3),
+    )
     wait = client.get(fresh_url)
     assert wait.status_code == 200
     assert "ready yet" in wait.text
@@ -222,8 +317,12 @@ def test_sign_and_pacing(client, config):
 
 def test_mature_ticket_is_idempotent(client, config):
     lesson = Lesson("vocab", 1, 1, "vocab_L1_0001.json")
+    old_issue = datetime.now(timezone.utc) - timedelta(days=3, seconds=1)
     old = make_ticket(
-        lesson, config.secret, datetime.now(timezone.utc) - timedelta(days=3, seconds=1)
+        lesson,
+        config.secret,
+        issued_at=old_issue,
+        available_at=old_issue,
     )
     url = "/next?t=" + old
     first = client.get(url)
@@ -317,7 +416,13 @@ def test_dotenv_supplies_github_settings(tmp_path: Path, monkeypatch: pytest.Mon
 
     def fake_fetch(repo, token, ref, lesson_path):
         assert (repo, token, ref) == ("owner/repo", "test-token", "main")
-        return {"vocab_L1_0001.json": b'{"lesson_id":"vocab_L1_0001"}'}
+        lesson = _lesson_data("vocab_L1_0001")
+        lesson["rules"]["server_routes"] = {
+            "advance": {"next_file": "vocab_L1_0001", "next_level": 1},
+            "retry": {"next_file": "vocab_L1_0001", "next_level": 1},
+            "stopped": {"next_file": "vocab_L1_0001", "next_level": 1},
+        }
+        return {"vocab_L1_0001.json": json.dumps(lesson).encode()}
 
     monkeypatch.setattr("server.config.fetch_lesson_files", fake_fetch)
     config = load_config()

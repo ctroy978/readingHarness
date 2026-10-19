@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from server.catalog import Category, Lesson, build_catalog
 from server.github import fetch_lesson_files, normalize_repository
+from server.lessons import load_protocol
 
 CATEGORY_KEY = re.compile(r"^[a-z][a-z0-9_-]*$")
 STAR_KEY = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
@@ -30,9 +31,11 @@ class Config:
     display_timezone: ZoneInfo
     categories: tuple[Category, ...]
     lessons: MappingProxyType[str, Lesson]
+    policies: MappingProxyType[str, object]
     lesson_bytes: MappingProxyType[str, bytes]
     entries: MappingProxyType[tuple[str, int], tuple[Lesson, ...]]
     star_rows: tuple[StarRow, ...]
+    protocol: MappingProxyType[str, object]
 
     def entry(self, skill: str, level: int) -> Lesson | None:
         lessons = self.entries.get((skill, level), ())
@@ -171,6 +174,9 @@ def _load_star_rows(config_dir: Path, categories: tuple[Category, ...]) -> tuple
 def load_config() -> Config:
     load_dotenv()
     config_dir = Path(os.environ.get("CONFIG_DIR", Path(__file__).parent / "config"))
+    protocol_path = config_dir / "protocol.json"
+    if not protocol_path.is_file():
+        protocol_path = Path(__file__).parent / "config" / "protocol.json"
     secret_text = os.environ.get("TICKET_SECRET", "")
     if len(secret_text.encode("utf-8")) < 32:
         raise RuntimeError("TICKET_SECRET must be set to at least 32 bytes")
@@ -187,7 +193,10 @@ def load_config() -> Config:
 
     categories = _load_categories(config_dir)
     lesson_files = _lesson_files()
-    lessons, entries = build_catalog(lesson_files, {category.key for category in categories})
+    lessons, entries, policies = build_catalog(
+        lesson_files, {category.key for category in categories}
+    )
+    protocol = MappingProxyType(load_protocol(protocol_path))
     star_rows = _load_star_rows(config_dir, categories)
     for row in star_rows:
         for skill, lesson_id in row.entries:
@@ -208,7 +217,9 @@ def load_config() -> Config:
         display_timezone=display_timezone,
         categories=categories,
         lessons=MappingProxyType(lessons),
+        policies=MappingProxyType(policies),
         lesson_bytes=MappingProxyType(lesson_files),
         entries=MappingProxyType(entries),
         star_rows=star_rows,
+        protocol=protocol,
     )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import html
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, quote
 
 from starlette.applications import Starlette
@@ -11,9 +11,13 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 
 from server.config import Config, load_config
-from server.tickets import TicketError, make_ticket, parse_unsigned_line, verify_ticket
-
-PACE = timedelta(days=3)
+from server.tickets import (
+    TicketError,
+    choose_route,
+    make_ticket,
+    parse_completion_line,
+    verify_ticket,
+)
 
 STYLE = """
 body{font:17px/1.5 system-ui,sans-serif;max-width:880px;margin:2rem auto;padding:0 1rem;color:#18202a}
@@ -84,8 +88,22 @@ def _serve(config: Config, lesson, status_on_missing: int = 404) -> Response | H
 
 
 def _sign_line(config: Config, line: str) -> str:
-    lesson = parse_unsigned_line(line, config.lesson)
-    ticket = make_ticket(lesson, config.secret)
+    completion = parse_completion_line(line, config.lesson, config.policies)
+    policy = config.policies[completion.lesson.id]
+    routing = config.protocol["routing"]
+    route = choose_route(completion, policy, routing["advance_min_got_there"])
+    lesson = config.lesson(route.next_file)
+    if lesson is None:
+        raise TicketError("Unknown lesson")
+    now = datetime.now(timezone.utc)
+    pace_days = config.protocol["pace_days"]
+    available_at = now if completion.stopped else now + timedelta(days=pace_days)
+    ticket = make_ticket(
+        lesson,
+        config.secret,
+        issued_at=now,
+        available_at=available_at,
+    )
     return f"{config.public_base_url}/next?t={quote(ticket, safe='')}"
 
 
@@ -113,7 +131,7 @@ def create_app(config: Config | None = None) -> Starlette:
 <li>Choose your Star score and lesson type. Your starting lesson will download.</li>
 <li>Open your AI. Upload the file. Type <code>begin</code>.</li>
 <li>When the lesson ends, the AI will give you a ticket line. <a href="/finish">Paste it on the finish page</a>.</li>
-<li>Bookmark the link you get there. That bookmark is how you get your next lesson.</li>
+<li>The server will choose your next lesson and show when it unlocks. Bookmark the link. Do not edit it.</li>
 </ol><p class="note">Do not share your link. It is yours.</p>""",
         )
 
@@ -126,17 +144,8 @@ def create_app(config: Config | None = None) -> Starlette:
                 return _invalid()
             lesson = config.star_entry(star, skill)
             return _serve(config, lesson) if lesson is not None else _unavailable()
-        level = request.query_params.get("level")
-        try:
-            parsed_level = int(level or "")
-        except ValueError:
-            return _invalid()
-        if not skill or parsed_level < 1:
-            return _invalid()
-        lesson = config.entry(skill, parsed_level)
-        if lesson is None:
-            return _invalid()
-        return _serve(config, lesson)
+        # Later lessons are reachable only through a server-selected, signed link.
+        return _invalid()
 
     async def sign(request: Request):
         # Signing is unauthenticated by design. Callers may choose any catalog lesson,
@@ -150,7 +159,7 @@ def create_app(config: Config | None = None) -> Starlette:
             if not isinstance(line, str):
                 raise TicketError("Invalid line")
             return JSONResponse({"url": _sign_line(config, line)})
-        except (json.JSONDecodeError, TicketError):
+        except (json.JSONDecodeError, KeyError, TypeError, TicketError):
             return JSONResponse({"error": "invalid line"}, status_code=400)
 
     async def finish(request: Request) -> HTMLResponse:
@@ -163,7 +172,7 @@ def create_app(config: Config | None = None) -> Starlette:
         values = parse_qs(body.decode("utf-8", "replace")).get("line", [])
         try:
             return _signed_page(_sign_line(config, values[0] if values else ""))
-        except TicketError:
+        except (KeyError, TypeError, TicketError):
             return _finish_form("That ticket line is not valid.", 400)
 
     async def next_lesson(request: Request):
@@ -174,9 +183,7 @@ def create_app(config: Config | None = None) -> Starlette:
             ticket = verify_ticket(t, config.secret, config.lesson)
         except TicketError:
             return _invalid()
-        available = ticket.issued_at + PACE
-        from datetime import datetime, timezone
-
+        available = ticket.available_at
         now = datetime.now(timezone.utc)
         if now < available:
             local = available.astimezone(config.display_timezone)

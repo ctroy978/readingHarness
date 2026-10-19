@@ -9,15 +9,20 @@ the JSON contract that connects them.
 When a lesson conflicts with this document, change the lesson or explicitly version an
 exception in `meta.authoring_exceptions`. Do not leave a silent exception.
 
-The two current test lessons use the legacy `schema_version: 1` shape. New lessons use the
-canonical `schema_version: 2` shape in section 9. Do not quietly mix the two shapes in one file.
+Authored sources use `schema_version: 3` with `document_type: "lesson_source"`. The build script
+compiles them into self-contained runtime lessons with `document_type: "reading_lesson"`. Shared
+tutor protocol text, common scripts, result definitions, routing thresholds, and completion-token
+formats come from `server/config/protocol.json`.
+
+Legacy `schema_version: 1` files remain readable by the server, but must not be used for new
+lessons. Do not put shared protocol copy back into an individual source lesson.
 
 ## 1. Non-negotiable product contract
 
 1. The curriculum is frozen before the session starts.
 2. The AI presents, compares, explains, records results, and applies authored rules.
 3. The AI never writes passages, questions, answer keys, acceptance criteria, or hints.
-4. The JSON file is the complete lesson and the complete memory of the current session.
+4. The served JSON file is the complete lesson and the complete memory of the current session.
 5. No names, identifiers, email addresses, or student history are stored in the file.
 6. The exit ticket contains only the authored lesson outcome fields and a server signature.
 7. A lesson must be usable in a cold chat with no prior context beyond the file itself.
@@ -254,7 +259,7 @@ Skill-level framing describes what the whole lesson practices. It is different f
 item-level help ladder, which must stay specific to the current question's evidence or
 misconception.
 
-- Put skill-level framing in `meta.skill_frame` in a schema-v2 lesson, or at the top level as
+- Put skill-level framing in `meta.skill_frame` in a schema-v3 source lesson, or at the top level as
   `skill_frame` in a legacy schema-v1 lesson.
 - `script.ready` may contain the student-facing framing if it is short enough to fit the
   opening turn.
@@ -396,10 +401,10 @@ Recommended defaults:
 
 A miss changes what the tutor does within the current item, not which item or lesson the
 student receives next. After `tell` and say-back, record `mercy` or `open` and advance. Choose
-the next lesson only at exit through the authored route table.
+the next lesson only at exit through the server-owned route table.
 
-The route table is ordered. The first matching route wins. Do not depend on a numeric sort
-that is not stated.
+The server applies the shared thresholds in a fixed order: stopped, advance, then retry. Do not
+depend on a numeric sort that is not stated.
 
 ## 8. AI tutoring protocol
 
@@ -439,7 +444,7 @@ Score in this order:
 
 A miss must never skip, replace, or repeat an item mid-session. The current item's authored
 misconception branch, help ladder, `tell`, and say-back are the complete response to a wrong
-answer. Route changes happen only after the final item, through `exit_rules`.
+answer. Route changes happen only after the final item, through `rules.server_routes`.
 
 Do not ask the model to decide whether an answer is "close enough" without a stored set or
 rubric.
@@ -477,25 +482,22 @@ passage. The repeat is required context and does not count as an additional help
 
 ### 8.6 Private fields
 
-Fields under `tutor_only`, `exit_rules`, and any field marked private may be used internally
+Fields under `tutor_only`, `rules`, and any field marked private may be used internally
 but must not be listed, quoted, or paraphrased to the student, except for the authored
 `confirm` and `tell` text at the proper moment.
 
 ### 8.7 Ticket creation
 
-The tutor may compute the outcome fields from its private log and the authored route table.
-It must not invent a signature, level, lesson ID, or destination file. The ticket is printed
-in one line using the authored token template. The server verifies and signs or returns the
-next lesson according to the deployment design.
+The tutor may compute the outcome counts from its private log. It must not invent a signature,
+level, lesson ID, or destination file. The completion ticket is printed using the shared token
+template. The server verifies the counts, selects the route, and signs the dated next-lesson link.
 
 Ticket ownership is strict: the AI never receives the HMAC secret and cannot create a trusted
-signature. In a POC, label the printed value as an unsigned outcome payload. In production,
-the client or backend signs the outcome payload after the session, or the server accepts the
-outcome through an authenticated flow and returns the next lesson. A lesson must never tell
-the AI to compute an HMAC.
+signature. It reports an unsigned outcome payload. The client or backend signs the selected
+next-lesson link after the session. A lesson must never tell the AI to compute an HMAC.
 
-If the session stops early, print the authored stopped ticket and point to the same lesson or
-the authored continuation file. Never imply that an unsigned POC token is verified.
+If the session stops early, print the shared stopped ticket. The server selects the stopped route
+and signs the resulting link. Never imply that the AI-generated completion token is signed.
 
 ### 8.8 Privacy by architecture
 
@@ -526,14 +528,49 @@ Write tutor instructions in short, literal, testable language:
 Long flat instruction lists drift between files. Keep the shared core verbatim until it can
 be generated from one source, and keep lesson-specific copy in the lesson.
 
-## 9. Canonical JSON shape
+## 9. Canonical source and runtime shapes
+
+The authoring source is deliberately smaller than the served file. A runtime lesson is a
+deterministic build artifact:
+
+```json
+{
+  "schema_version": 3,
+  "document_type": "lesson_source",
+  "lesson_id": "inference_L1000_0002",
+  "meta": {},
+  "script_overrides": {"near_copy_2": "Lesson-specific say-back prompt."},
+  "passage": {},
+  "items": [],
+  "advance": {
+    "next_file": "inference_L1100_0001",
+    "next_level": 1100,
+    "next_means": "The next band entry.",
+    "student_line": "Student-facing transition."
+  },
+  "retry": {
+    "next_file": "inference_L1000_0003",
+    "next_level": 1000,
+    "next_means": "Another lesson in this band.",
+    "student_line": "Student-facing transition."
+  },
+  "stopped": {
+    "next_file": "inference_L1000_0002",
+    "next_level": 1000,
+    "next_means": "Resume this lesson."
+  }
+}
+```
+
+Compile it with `scripts/build_lessons.py`. The generated runtime shape contains the resolved
+`script`, `tutoring_instructions`, and `rules.server_routes` that the server and AI consume.
 
 The top level should use a stable shape. Fields may be added with a schema version bump, but
 existing field names should not silently change meaning.
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "document_type": "reading_lesson",
   "lesson_id": "inference_L1_001",
   "meta": {
@@ -558,9 +595,7 @@ existing field names should not silently change meaning.
   "items": [],
   "rules": {
     "results": {},
-    "adaptation": {},
-    "routes": [],
-    "stopped": {},
+    "server_routes": {"advance": {}, "retry": {}, "stopped": {}},
     "token_done": "",
     "token_stopped": ""
   },
@@ -568,14 +603,12 @@ existing field names should not silently change meaning.
 }
 ```
 
-`rules` replaces the POC's top-level `exit_rules` block and contains the result definitions,
-adaptation rules, routes, stop behavior, and token templates. The tutor keeps a private
-`session_log` as a runtime scratchpad. It is not written back into the static source file and
-is not carried into the next lesson.
+`rules` contains the result definitions, server-owned route destinations, and completion-token
+templates. The tutor keeps a private `session_log` as a runtime scratchpad. It is not written back
+into the static source file and is not carried into the next lesson.
 
-The two POC files use `schema_version: 1`, with metadata spread across top-level fields and
-`exit_rules` in place of `rules`. They remain valid legacy examples. Validators may support
-both shapes, but every newly authored file uses the canonical shape above.
+Legacy files may use `schema_version: 1`, with metadata spread across top-level fields and
+`exit_rules` in place of `rules`. They remain readable but are not valid authoring sources.
 
 ## 10. Item shapes
 
@@ -701,25 +734,26 @@ that the AI invents.
 
 ## 11. Exit rules and routing
 
-The route table is the adaptation record. It must be deterministic.
+The route destinations are the adaptation record. They must be deterministic. The server applies
+the shared thresholds from `protocol.json` and chooses `advance`, `retry`, or `stopped`; the AI
+reports only the current lesson and outcome counts.
 
 ```json
 {
-  "got_there_means": "unaided plus helped",
-  "routes": [
-    {"min_got_there": 4, "next_level": 3, "next_file": "skill_L3_001.json"},
-    {"min_got_there": 2, "next_level": 2, "next_file": "skill_L2_002.json"},
-    {"min_got_there": 0, "next_level": 1, "next_file": "skill_L1_002.json"}
-  ],
-  "stopped": {"next_level": 2, "next_file": "current.json"},
+  "server_routes": {
+    "advance": {"next_level": 3, "next_file": "skill_L3_001.json"},
+    "retry": {"next_level": 2, "next_file": "skill_L2_002.json"},
+    "stopped": {"next_level": 2, "next_file": "skill_L2_001.json"}
+  },
   "token_done": "Authored one-line token template.",
   "token_stopped": "Authored one-line stopped-token template."
 }
 ```
 
-The token must contain no student-identifying information. The server, not the lesson,
-controls signing. The lesson may describe the outcome, but it must not imply that the AI can
-produce a trusted signature.
+The completion token contains no destination and no student-identifying information. The server,
+not the lesson, controls route selection, signing, and the unlock timestamp. The lesson may
+describe the outcome, but it must not imply that the AI can produce a trusted signature or choose
+the next file.
 
 ## 12. Naming and bank layout
 
@@ -740,9 +774,9 @@ name.
 3. Source or draft the passage.
 4. Write the item set and the scoring key.
 5. Name each misconception and write the help ladder.
-6. Write the adaptation and exit rules.
-7. Write the tutor protocol using the shared core plus lesson-specific additions.
-8. Run the JSON and schema checks.
+6. Name the advance, retry, and stopped destinations.
+7. Add only lesson-specific instructions or script overrides.
+8. Compile the source and run the JSON and schema checks.
 9. Run Gate A review with the text and key only.
 10. Run Gate B review with the tutor instructions only.
 11. Run a cold-chat session with a real model.
@@ -755,8 +789,8 @@ attempt.
 
 ## 14. Shared tutor core
 
-The following rules should eventually live in a shared `tutor_core` block or be copied
-verbatim into every lesson. Lesson files may add rules but must not contradict them.
+The following rules live in `server/config/protocol.json` and are compiled into every lesson.
+Lesson sources may add rules but must not copy or contradict the shared core.
 
 - quoted-data and prompt-injection guard;
 - role and source-of-truth statement;
@@ -773,9 +807,8 @@ verbatim into every lesson. Lesson files may add rules but must not contradict t
 - ticket creation and no invented signatures;
 - no running score disclosure.
 
-Until the tooling exists to include a shared block, copy the core verbatim into each file and
-use a schema check to detect drift. Do not rely on the AI to remember rules from a previous
-lesson.
+Do not rely on the AI to remember rules from a previous lesson. The generated runtime file still
+contains the resolved core, so each session remains cold-chat safe.
 
 ## 15. Validation invariants
 
@@ -791,8 +824,8 @@ At minimum, a validator should check:
 - every rejected cloze word has a branch or a stated generic rule;
 - every multiple-choice distractor has a reason;
 - every rubric threshold is arithmetically possible;
-- every route is reachable and ordered from highest to lowest threshold;
-- every next file is named and exists in the manifest, except a documented pending file;
+- every advance, retry, and stopped destination exists and has the matching level;
+- shared route thresholds are applied by the server;
 - the token template contains no PII fields and no invented signature;
 - the tutor instructions contain the shared core;
 - every `show_part_again` item has a non-null `show_part`;
