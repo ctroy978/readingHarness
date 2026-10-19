@@ -4,14 +4,16 @@ import asyncio
 import io
 import json
 import tarfile
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import MappingProxyType
 from urllib.parse import urlsplit
 
 import pytest
 
 from server.app import create_app
-from server.catalog import Lesson
+from server.catalog import Lesson, build_catalog
 from server.config import _public_base_url, load_config
 from server.github import normalize_repository, parse_lesson_files
 from server.tickets import make_ticket
@@ -41,9 +43,16 @@ def config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                     {
                         "key": "300-499",
                         "label": "300-499",
-                        "entries": {"vocab": 1, "inference": 1},
+                        "entries": {
+                            "vocab": "vocab_L1_0001",
+                            "inference": "inference_L1_0010",
+                        },
                     },
-                    {"key": "500-plus", "label": "500+", "entries": {"inference": 2}},
+                    {
+                        "key": "500-plus",
+                        "label": "500+",
+                        "entries": {"inference": "inference_L2_0010"},
+                    },
                 ]
             }
         )
@@ -152,9 +161,30 @@ def test_onboarding_and_ordering(client):
 
 
 def test_star_and_type_select_starting_lesson(client):
-    response = client.get("/start?star=300-499&skill=vocab")
+    response = client.get("/start?star=300-499&skill=inference")
     assert response.status_code == 200
-    assert "vocab_L1_0001.json" in response.headers["content-disposition"]
+    assert "inference_L1_0010.json" in response.headers["content-disposition"]
+
+
+def test_star_entry_does_not_depend_on_sequence_order(
+    config, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    lessons = dict(config.lesson_bytes)
+    lessons["inference_L1_0001.json"] = json.dumps(
+        {"lesson_id": "inference_L1_0001", "schema_version": 1}
+    ).encode()
+    lessons["inference_L1_9999.json"] = json.dumps(
+        {"lesson_id": "inference_L1_9999", "schema_version": 1}
+    ).encode()
+    new_lessons, _ = build_catalog(lessons, {"vocab", "inference", "process"})
+    replacement = replace(
+        config,
+        lessons=MappingProxyType(new_lessons),
+        lesson_bytes=MappingProxyType(lessons),
+    )
+    response = AsgiClient(create_app(replacement)).get("/start?star=300-499&skill=inference")
+    assert response.status_code == 200
+    assert "inference_L1_0010.json" in response.headers["content-disposition"]
 
 
 def test_unavailable_star_and_type_combination(client):
@@ -267,7 +297,11 @@ def test_dotenv_supplies_github_settings(tmp_path: Path, monkeypatch: pytest.Mon
         json.dumps(
             {
                 "star_rows": [
-                    {"key": "300", "label": "300", "entries": {"vocab": 1}}
+                    {
+                        "key": "300",
+                        "label": "300",
+                        "entries": {"vocab": "vocab_L1_0001"},
+                    }
                 ]
             }
         )

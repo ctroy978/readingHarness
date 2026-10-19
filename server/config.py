@@ -20,7 +20,7 @@ STAR_KEY = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 class StarRow:
     key: str
     label: str
-    entries: tuple[tuple[str, int], ...]
+    entries: tuple[tuple[str, str], ...]
 
 
 @dataclass(frozen=True)
@@ -43,6 +43,11 @@ class Config:
 
     def star_row(self, key: str) -> StarRow | None:
         return next((row for row in self.star_rows if row.key == key), None)
+
+    def star_entry(self, star: str, skill: str) -> Lesson | None:
+        row = self.star_row(star)
+        lesson_id = dict(row.entries).get(skill) if row is not None else None
+        return self.lesson(lesson_id) if lesson_id is not None else None
 
 
 def _read_json(path: Path) -> object:
@@ -150,13 +155,13 @@ def _load_star_rows(config_dir: Path, categories: tuple[Category, ...]) -> tuple
             raise RuntimeError(f"Star row {label!r} needs an entries object")
         if any(row.key == key for row in rows):
             raise RuntimeError("Star row keys must be unique")
-        parsed: list[tuple[str, int]] = []
-        for skill, level in entries.items():
+        parsed: list[tuple[str, str]] = []
+        for skill, lesson_id in entries.items():
             if skill not in allowed:
                 raise RuntimeError(f"Unknown category in Star table: {skill!r}")
-            if not isinstance(level, int) or level < 1:
-                raise RuntimeError(f"Invalid level for {skill!r} in Star row {label!r}")
-            parsed.append((skill, level))
+            if not isinstance(lesson_id, str) or not lesson_id:
+                raise RuntimeError(f"Invalid entry lesson for {skill!r} in Star row {label!r}")
+            parsed.append((skill, lesson_id))
         rows.append(StarRow(key=key, label=label.strip(), entries=tuple(parsed)))
     if not rows:
         raise RuntimeError("At least one Star row is required")
@@ -185,9 +190,17 @@ def load_config() -> Config:
     lessons, entries = build_catalog(lesson_files, {category.key for category in categories})
     star_rows = _load_star_rows(config_dir, categories)
     for row in star_rows:
-        for skill, level in row.entries:
-            if (skill, level) not in entries:
-                raise RuntimeError(f"Star row {row.label!r} points to missing {skill} L{level}")
+        for skill, lesson_id in row.entries:
+            lesson = lessons.get(lesson_id)
+            if lesson is None:
+                raise RuntimeError(
+                    f"Star row {row.label!r} points to missing lesson {lesson_id!r}"
+                )
+            if lesson.skill != skill:
+                raise RuntimeError(
+                    f"Star row {row.label!r} maps {skill!r} to {lesson_id!r}, "
+                    f"which belongs to {lesson.skill!r}"
+                )
 
     return Config(
         secret=secret_text.encode("utf-8"),

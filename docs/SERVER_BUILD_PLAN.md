@@ -228,10 +228,11 @@ release `LESSON_DIR`; the builder should also reject `meta.status == "draft"` fo
 lessons. For the current schema-v1 POCs, treat inclusion in the release directory as the publish
 signal and migrate their metadata when they enter the production bank.
 
-To find the first lesson at a category-level entry point, `/start` selects the lowest numeric
-sequence for that category and level. If the teacher wants a different entry lesson, they can
-change the sequence number or add an explicit `entry_lesson` field to the catalog configuration.
-Do not sort filenames lexically. Sequence `10` comes after `9`, not after `1`.
+For Star-based onboarding, `/start` serves the exact lesson named in `onboarding.json` for that
+score band and category. Later lessons are reached through signed exit tickets, so adding another
+file at the same category and level does not change the entry point. A direct `/start` request may
+still select the lowest numeric sequence for development and diagnostics. Do not sort filenames
+lexically: sequence `10` comes after `9`, not after `1`.
 
 ## 5. Ticket Module
 

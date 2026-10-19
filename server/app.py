@@ -124,10 +124,7 @@ def create_app(config: Config | None = None) -> Starlette:
             row = config.star_row(star)
             if row is None or not skill or skill not in {category.key for category in config.categories}:
                 return _invalid()
-            level = dict(row.entries).get(skill)
-            if level is None:
-                return _unavailable()
-            lesson = config.entry(skill, level)
+            lesson = config.star_entry(star, skill)
             return _serve(config, lesson) if lesson is not None else _unavailable()
         level = request.query_params.get("level")
         try:

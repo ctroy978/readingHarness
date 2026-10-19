@@ -69,7 +69,7 @@ Edit `server/config/categories.json`. Each category has a permanent lowercase `k
 ```
 
 Then add one or more lesson files using the new key to the GitHub lesson repository, map its entry
-levels in `server/config/onboarding.json`, and restart the server. No Python changes are needed.
+lesson in `server/config/onboarding.json`, and restart the server. No Python changes are needed.
 
 Keys may contain lowercase letters, digits, underscores, and hyphens. Do not rename a key after
 students have signed tickets containing it.
@@ -114,23 +114,25 @@ The 3-day clock starts when the server signs the line.
 ## Add or change Star entry levels
 
 Edit `server/config/onboarding.json`. Each row has a stable `key`, a displayed score `label`, and
-an `entries` object mapping category keys to entry levels:
+an `entries` object mapping category keys to the exact ID of the first lesson:
 
 ```json
 {
   "key": "600-699",
   "label": "600-699",
-  "entries": {"inference": 3, "vocab": 2}
+  "entries": {"inference": "inference_L3_0001", "vocab": "vocab_L2_0001"}
 }
 ```
 
-Every entry must point to at least one published lesson at that category and level. A row may
-have an empty `entries` object; those score and lesson-type combinations display "Lesson not
-available". Restart the server after editing.
+Every entry must name a published lesson in that category. A row may have an empty `entries`
+object; those score and lesson-type combinations display "Lesson not available". Restart the
+server after editing.
 
 The onboarding page has two selectors: Star score and lesson type. It submits directly to the
-starting lesson for that combination. The lesson type list comes from `categories.json`, so a
-new category appears without changing the page template.
+configured entry lesson for that combination. Later lessons are reached only through signed exit
+tickets, so adding another file at the same level never changes the onboarding entry point. The
+lesson type list comes from `categories.json`, so a new category appears without changing the
+page template.
 
 ## Deploy
 
