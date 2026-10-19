@@ -17,8 +17,9 @@ PACE = timedelta(days=3)
 
 STYLE = """
 body{font:17px/1.5 system-ui,sans-serif;max-width:880px;margin:2rem auto;padding:0 1rem;color:#18202a}
-table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #aab3bd;padding:.55rem;text-align:left}
 a{color:#064f8c}code,textarea{font:14px/1.4 ui-monospace,monospace}textarea{width:100%;min-height:8rem}
+label{display:block;font-weight:600;margin:.9rem 0 .3rem}select{width:100%;max-width:32rem;font:inherit;padding:.55rem}
+button{font:inherit;padding:.55rem 1rem;margin-top:1rem}
 .note{background:#f2f5f7;border-left:4px solid #60758a;padding:.7rem 1rem}
 """.strip()
 
@@ -37,6 +38,13 @@ def _invalid(status: int = 400) -> HTMLResponse:
     )
     response.status_code = status
     return response
+
+
+def _unavailable() -> HTMLResponse:
+    return _page(
+        "Lesson not available",
+        '<p>Lesson not available for that Star score and lesson type.</p><p><a href="/">Choose another lesson</a></p>',
+    )
 
 
 def _finish_form(message: str = "", status: int = 200) -> HTMLResponse:
@@ -85,29 +93,24 @@ def create_app(config: Config | None = None) -> Starlette:
     config = config or load_config()
 
     async def onboarding(request: Request) -> HTMLResponse:
-        headings = "".join(
-            f"<th>{html.escape(category.label)}</th>" for category in config.categories
+        score_options = "".join(
+            f'<option value="{html.escape(row.key, quote=True)}">{html.escape(row.label)}</option>'
+            for row in config.star_rows
         )
-        rows = []
-        for row in config.star_rows:
-            cells = []
-            for category in config.categories:
-                level = dict(row.entries).get(category.key)
-                if level is None:
-                    cells.append("<td></td>")
-                else:
-                    href = f"/start?skill={quote(category.key)}&amp;level={level}"
-                    cells.append(
-                        f'<td><a href="{href}">Start {html.escape(category.label)} L{level}</a></td>'
-                    )
-            rows.append(f"<tr><th>{html.escape(row.label)}</th>{''.join(cells)}</tr>")
+        type_options = "".join(
+            f'<option value="{html.escape(category.key, quote=True)}">{html.escape(category.label)}</option>'
+            for category in config.categories
+        )
         return _page(
             "Reading program",
             f"""<p>This is a reading program. You will get one lesson at a time.</p>
-<table><thead><tr><th>Star score</th>{headings}</tr></thead><tbody>{''.join(rows)}</tbody></table>
+<form method="get" action="/start">
+<label for="star">Star score</label><select id="star" name="star" required>{score_options}</select>
+<label for="skill">Lesson type</label><select id="skill" name="skill" required>{type_options}</select>
+<button type="submit">Find my starting lesson</button>
+</form>
 <h2>What to do</h2><ol>
-<li>Find your Star score in the table. Click the link in your row.</li>
-<li>A file will download. Save it or remember where it went.</li>
+<li>Choose your Star score and lesson type. Your starting lesson will download.</li>
 <li>Open your AI. Upload the file. Type <code>begin</code>.</li>
 <li>When the lesson ends, the AI will give you a ticket line. <a href="/finish">Paste it on the finish page</a>.</li>
 <li>Bookmark the link you get there. That bookmark is how you get your next lesson.</li>
@@ -116,6 +119,16 @@ def create_app(config: Config | None = None) -> Starlette:
 
     async def start(request: Request):
         skill = request.query_params.get("skill")
+        star = request.query_params.get("star")
+        if star is not None:
+            row = config.star_row(star)
+            if row is None or not skill or skill not in {category.key for category in config.categories}:
+                return _invalid()
+            level = dict(row.entries).get(skill)
+            if level is None:
+                return _unavailable()
+            lesson = config.entry(skill, level)
+            return _serve(config, lesson) if lesson is not None else _unavailable()
         level = request.query_params.get("level")
         try:
             parsed_level = int(level or "")

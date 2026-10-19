@@ -1,6 +1,12 @@
 {
   "categories": [
-    {"key": "inference", "label": "Inference", "order": 10},
-    {"key": "process", "label": "Process", "order": 20}
+    {"key": "vocab", "label": "Vocabulary", "order": 10},
+    {"key": "main_idea", "label": "Main idea and details", "order": 20},
+    {"key": "inference", "label": "Inference and conclusions", "order": 30},
+    {"key": "process", "label": "Sequence and process", "order": 40},
+    {"key": "text_structure", "label": "Text structure", "order": 50},
+    {"key": "literary_text", "label": "Literary text", "order": 60},
+    {"key": "authors_craft", "label": "Author's craft", "order": 70},
+    {"key": "argument_evidence", "label": "Argument and evidence", "order": 80}
   ]
 }

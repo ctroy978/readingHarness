@@ -11,7 +11,7 @@ bookmark, signing, and privacy requirements.
 
 Deliver a small server with five public behaviors:
 
-1. `GET /` shows the teacher-maintained Star score table and student instructions.
+1. `GET /` shows Star score and lesson-type selectors plus student instructions.
 2. `GET /start` validates a category and level, then downloads the first lesson at that entry
    point.
 3. `POST /sign` turns an unsigned AI exit line naming an exact catalog lesson into a signed,
@@ -293,7 +293,7 @@ legacy parser unless distributing older lesson formats becomes an explicit requi
 Render the onboarding page from the validated table configuration. It includes:
 
 - the short reading-program explanation;
-- a Star score to entry-level table with one `/start?skill=...&level=...` link per cell or row;
+- Star score and lesson-type selectors that submit one starting-lesson request;
 - numbered instructions for finding the score, downloading the lesson, uploading it to the AI,
   pasting the AI's unsigned exit line on the finish page, and bookmarking the returned link;
 - the "Do not share your link" note.
@@ -400,7 +400,7 @@ duplicate rejection, category additions, and a synthetic category with more than
 
 | Acceptance item | Planned verification |
 | --- | --- |
-| Onboarding content | Route test asserts explanation, table links, numbered instructions, bookmark warning, and no third-party scripts. |
+| Onboarding content | Route test asserts score and lesson-type selectors, numbered instructions, bookmark warning, and no third-party scripts. |
 | Category registry | Adding a configured category with cataloged lessons makes its onboarding links and downloads work without code changes. |
 | Entry download | `/start?level=4&skill=inference` selects the lowest numeric sequence at that level and returns the cataloged attachment; bad inputs return 400. |
 | Sequence order | Levels and sequences are compared numerically; `10` follows `9`, and `1000` is accepted. |

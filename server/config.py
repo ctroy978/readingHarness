@@ -13,10 +13,12 @@ from server.catalog import Category, Lesson, build_catalog
 from server.github import fetch_lesson_files, normalize_repository
 
 CATEGORY_KEY = re.compile(r"^[a-z][a-z0-9_-]*$")
+STAR_KEY = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 
 
 @dataclass(frozen=True)
 class StarRow:
+    key: str
     label: str
     entries: tuple[tuple[str, int], ...]
 
@@ -38,6 +40,9 @@ class Config:
 
     def lesson(self, lesson_id: str) -> Lesson | None:
         return self.lessons.get(lesson_id)
+
+    def star_row(self, key: str) -> StarRow | None:
+        return next((row for row in self.star_rows if row.key == key), None)
 
 
 def _read_json(path: Path) -> object:
@@ -134,12 +139,17 @@ def _load_star_rows(config_dir: Path, categories: tuple[Category, ...]) -> tuple
     for item in raw["star_rows"]:
         if not isinstance(item, dict):
             raise RuntimeError("Each Star row must be an object")
+        key = item.get("key")
         label = item.get("label")
         entries = item.get("entries")
+        if not isinstance(key, str) or not STAR_KEY.fullmatch(key):
+            raise RuntimeError("Each Star row needs a stable key")
         if not isinstance(label, str) or not label.strip():
             raise RuntimeError("Each Star row needs a label")
-        if not isinstance(entries, dict) or not entries:
-            raise RuntimeError(f"Star row {label!r} needs entries")
+        if not isinstance(entries, dict):
+            raise RuntimeError(f"Star row {label!r} needs an entries object")
+        if any(row.key == key for row in rows):
+            raise RuntimeError("Star row keys must be unique")
         parsed: list[tuple[str, int]] = []
         for skill, level in entries.items():
             if skill not in allowed:
@@ -147,7 +157,7 @@ def _load_star_rows(config_dir: Path, categories: tuple[Category, ...]) -> tuple
             if not isinstance(level, int) or level < 1:
                 raise RuntimeError(f"Invalid level for {skill!r} in Star row {label!r}")
             parsed.append((skill, level))
-        rows.append(StarRow(label=label.strip(), entries=tuple(parsed)))
+        rows.append(StarRow(key=key, label=label.strip(), entries=tuple(parsed)))
     if not rows:
         raise RuntimeError("At least one Star row is required")
     return tuple(rows)

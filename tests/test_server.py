@@ -38,8 +38,12 @@ def config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         json.dumps(
             {
                 "star_rows": [
-                    {"label": "300-499", "entries": {"vocab": 1, "inference": 1}},
-                    {"label": "500+", "entries": {"inference": 2}},
+                    {
+                        "key": "300-499",
+                        "label": "300-499",
+                        "entries": {"vocab": 1, "inference": 1},
+                    },
+                    {"key": "500-plus", "label": "500+", "entries": {"inference": 2}},
                 ]
             }
         )
@@ -139,10 +143,25 @@ class AsgiClient:
 def test_onboarding_and_ordering(client):
     response = client.get("/")
     assert response.status_code == 200
+    assert '<select id="star" name="star"' in response.text
+    assert '<select id="skill" name="skill"' in response.text
     assert "Vocabulary" in response.text
     assert "Inference" in response.text
     assert response.text.index("Vocabulary") < response.text.index("Inference")
     assert "Bookmark" in response.text
+
+
+def test_star_and_type_select_starting_lesson(client):
+    response = client.get("/start?star=300-499&skill=vocab")
+    assert response.status_code == 200
+    assert "vocab_L1_0001.json" in response.headers["content-disposition"]
+
+
+def test_unavailable_star_and_type_combination(client):
+    response = client.get("/start?star=500-plus&skill=vocab")
+    assert response.status_code == 200
+    assert "Lesson not available" in response.text
+    assert client.get("/start?star=missing&skill=vocab").status_code == 400
 
 
 def test_start_uses_lowest_numeric_sequence(client):
@@ -245,7 +264,13 @@ def test_dotenv_supplies_github_settings(tmp_path: Path, monkeypatch: pytest.Mon
         json.dumps({"categories": [{"key": "vocab", "label": "Vocabulary", "order": 1}]})
     )
     (config_dir / "onboarding.json").write_text(
-        json.dumps({"star_rows": [{"label": "300", "entries": {"vocab": 1}}]})
+        json.dumps(
+            {
+                "star_rows": [
+                    {"key": "300", "label": "300", "entries": {"vocab": 1}}
+                ]
+            }
+        )
     )
     dotenv = tmp_path / ".env"
     dotenv.write_text(

@@ -1,6 +1,9 @@
 {
   "star_rows": [
-    {"label": "300-499", "entries": {"inference": 5}},
-    {"label": "500 and above", "entries": {"inference": 5, "process": 9}}
+    {"key": "900-999", "label": "900-999", "entries": {}},
+    {"key": "1000-1099", "label": "1000-1099", "entries": {"inference": 5}},
+    {"key": "1100-1199", "label": "1100-1199", "entries": {}},
+    {"key": "1200-1299", "label": "1200-1299", "entries": {}},
+    {"key": "1300-1400", "label": "1300-1400", "entries": {"process": 9}}
   ]
 }
