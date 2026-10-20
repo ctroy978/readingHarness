@@ -29,8 +29,8 @@
     "stop_confirm": "Stop here? Say yes and I will end the reading. I will write a ticket that shows where we stopped.",
     "passage_label": "Passage",
     "question_label": "Question",
-    "ticket_done": "That's the reading.\n\nTicket:\n{token}\n\nThis ticket is not a grade. Paste it on the finish page. The server will choose the next lesson and set its unlock time.",
-    "ticket_stopped": "We'll stop here.\n\nWe finished {done} of {total}. We stopped at {stopped_at}.\n\nTicket:\n{token}\n\nThe server will choose the next lesson and set its unlock time."
+    "ticket_done": "That's the reading.\n\nTicket:\n{token}\n\nThis ticket is not a grade. Paste it on the finish page. The server will choose the next lesson and set its unlock time. If a teacher asked you to turn this in, show them this ticket.",
+    "ticket_stopped": "We'll stop here.\n\nWe finished {done} of {total}. We stopped at {stopped_at}.\n\nTicket:\n{token}\n\nThe server will choose the next lesson and set its unlock time. If a teacher asked you to turn this in, show them this ticket."
   },
   "tokens": {
     "done": "v1|from={lesson_id}|done={done}|got_there={got_there}",
