@@ -246,12 +246,15 @@ readability score.
 
 ### 5.3 Passage display
 
-Each item declares `show_part` as a passage key or `null`. The tutor shows the referenced
+Each item declares `show_part` as a passage key, `all`, or `null`. The tutor shows the referenced
 part exactly once unless the item sets `show_part_again: true`. Use that flag when the item
 depends on text the student may no longer have in view.
 
-Do not require the student to remember unseen passage text. Do not reprint the whole passage
-as a substitute for a precise re-display rule.
+Use `show_part: "all"` only for a whole-passage item. It reprints every passage part in order under
+one passage label before the prompt. It is not a shortcut for a question that needs one part.
+
+Do not require the student to remember unseen passage text. Do not reprint the whole passage as a
+substitute for a precise per-part rule.
 
 ### 5.4 Skill-level framing
 

@@ -67,7 +67,8 @@ reading review and the AI review pass.
 
 - [ ] `jq empty` passes.
 - [ ] Item IDs are unique.
-- [ ] Every passage key referenced by `show_part` exists.
+- [ ] Every `show_part` is an existing passage key or `all`.
+- [ ] Every `show_part: "all"` item is a whole-passage item.
 - [ ] Every `show_part_again` item has a non-null `show_part`.
 - [ ] Every non-rubric item has an explicit answer key.
 - [ ] Every item has `skill`, `difficulty`, and `correct_reason` in a production lesson.
