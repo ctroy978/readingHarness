@@ -71,6 +71,8 @@ reading review and the AI review pass.
 - [ ] Every `show_part: "all"` item is a whole-passage item.
 - [ ] Every `show_part_again` item has a non-null `show_part`.
 - [ ] Every non-rubric item has an explicit answer key.
+- [ ] Every `short_answer` item has a `core_idea` and, where needed, `not_required`.
+- [ ] The `core_idea` is the minimum credit idea, not the full model answer.
 - [ ] Every item has `skill`, `difficulty`, and `correct_reason` in a production lesson.
 - [ ] Every `use_word` say-back has a target word.
 - [ ] Every rubric threshold is possible.
