@@ -73,6 +73,7 @@ reading review and the AI review pass.
 - [ ] Every non-rubric item has an explicit answer key.
 - [ ] Every `short_answer` item has a `core_idea` and, where needed, `not_required`.
 - [ ] The `core_idea` is the minimum credit idea, not the full model answer.
+- [ ] `short_answer` accepts a meaning-preserving synonym; `cloze` and `multiple_choice` stay exact.
 - [ ] Every item has `skill`, `difficulty`, and `correct_reason` in a production lesson.
 - [ ] Every `use_word` say-back has a target word.
 - [ ] Every rubric threshold is possible.

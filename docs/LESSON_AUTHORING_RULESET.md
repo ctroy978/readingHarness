@@ -288,9 +288,12 @@ Every item must contain:
 For `short_answer`, `tutor_only` also stores `core_idea`: the minimum proposition that earns
 credit. It may store `not_required`: supporting details the prompt does not demand. Score the
 `core_idea`, not the wording of `accept_ideas`. A paraphrase, fragment, or rough answer that
-expresses the core idea and is supported by the passage is correct. If the answer could express
-the idea but is ambiguous, ask `script.clarify` and wait; that is an unclear state, not a miss and
-not a help.
+expresses the core idea and is supported by the passage is correct. A synonym that preserves the
+idea is the same answer, not a new accepted answer; do not require the passage's exact words.
+This synonym tolerance applies only to `short_answer`, not to `cloze` or `multiple_choice`. A
+synonym may not change quantity, negation, sequence, cause, or comparison. If the answer could
+express the idea but is ambiguous, ask `script.clarify` and wait; that is an unclear state, not a
+miss and not a help.
 
 The item's `skill` should normally match the lesson's primary skill. Use a different value
 only when the item is intentionally measuring a prerequisite or a separately declared
