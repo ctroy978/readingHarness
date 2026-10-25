@@ -12,13 +12,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from server.catalog import Category, Lesson, build_catalog
 from server.github import fetch_lesson_files, normalize_repository
 from server.lessons import load_protocol
+from server.progression import Curriculum, load_curriculum
 
 CATEGORY_KEY = re.compile(r"^[a-z][a-z0-9_-]*$")
-STAR_KEY = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+IRL_KEY = re.compile(r"^\d{1,2}\.\d$")
 
 
 @dataclass(frozen=True)
-class StarRow:
+class IrlRow:
     key: str
     label: str
     entries: tuple[tuple[str, str], ...]
@@ -34,8 +35,9 @@ class Config:
     policies: MappingProxyType[str, object]
     lesson_bytes: MappingProxyType[str, bytes]
     entries: MappingProxyType[tuple[str, int], tuple[Lesson, ...]]
-    star_rows: tuple[StarRow, ...]
+    irl_rows: tuple[IrlRow, ...]
     protocol: MappingProxyType[str, object]
+    curriculum: Curriculum
 
     def entry(self, skill: str, level: int) -> Lesson | None:
         lessons = self.entries.get((skill, level), ())
@@ -44,11 +46,11 @@ class Config:
     def lesson(self, lesson_id: str) -> Lesson | None:
         return self.lessons.get(lesson_id)
 
-    def star_row(self, key: str) -> StarRow | None:
-        return next((row for row in self.star_rows if row.key == key), None)
+    def irl_row(self, key: str) -> IrlRow | None:
+        return next((row for row in self.irl_rows if row.key == key), None)
 
-    def star_entry(self, star: str, skill: str) -> Lesson | None:
-        row = self.star_row(star)
+    def irl_entry(self, irl: str, skill: str) -> Lesson | None:
+        row = self.irl_row(irl)
         lesson_id = dict(row.entries).get(skill) if row is not None else None
         return self.lesson(lesson_id) if lesson_id is not None else None
 
@@ -138,36 +140,36 @@ def _load_categories(config_dir: Path) -> tuple[Category, ...]:
     return tuple(sorted(categories, key=lambda category: category.order))
 
 
-def _load_star_rows(config_dir: Path, categories: tuple[Category, ...]) -> tuple[StarRow, ...]:
+def _load_irl_rows(config_dir: Path, categories: tuple[Category, ...]) -> tuple[IrlRow, ...]:
     raw = _read_json(config_dir / "onboarding.json")
-    if not isinstance(raw, dict) or not isinstance(raw.get("star_rows"), list):
-        raise RuntimeError("onboarding.json must contain a star_rows list")
+    if not isinstance(raw, dict) or not isinstance(raw.get("irl_rows"), list):
+        raise RuntimeError("onboarding.json must contain an irl_rows list")
     allowed = {category.key for category in categories}
-    rows: list[StarRow] = []
-    for item in raw["star_rows"]:
+    rows: list[IrlRow] = []
+    for item in raw["irl_rows"]:
         if not isinstance(item, dict):
-            raise RuntimeError("Each Star row must be an object")
+            raise RuntimeError("Each IRL row must be an object")
         key = item.get("key")
         label = item.get("label")
         entries = item.get("entries")
-        if not isinstance(key, str) or not STAR_KEY.fullmatch(key):
-            raise RuntimeError("Each Star row needs a stable key")
+        if not isinstance(key, str) or not IRL_KEY.fullmatch(key):
+            raise RuntimeError("Each IRL row needs a band key such as 5.1")
         if not isinstance(label, str) or not label.strip():
-            raise RuntimeError("Each Star row needs a label")
+            raise RuntimeError("Each IRL row needs a label")
         if not isinstance(entries, dict):
-            raise RuntimeError(f"Star row {label!r} needs an entries object")
+            raise RuntimeError(f"IRL row {label!r} needs an entries object")
         if any(row.key == key for row in rows):
-            raise RuntimeError("Star row keys must be unique")
+            raise RuntimeError("IRL row keys must be unique")
         parsed: list[tuple[str, str]] = []
         for skill, lesson_id in entries.items():
             if skill not in allowed:
-                raise RuntimeError(f"Unknown category in Star table: {skill!r}")
+                raise RuntimeError(f"Unknown category in IRL table: {skill!r}")
             if not isinstance(lesson_id, str) or not lesson_id:
-                raise RuntimeError(f"Invalid entry lesson for {skill!r} in Star row {label!r}")
+                raise RuntimeError(f"Invalid entry lesson for {skill!r} in IRL row {label!r}")
             parsed.append((skill, lesson_id))
-        rows.append(StarRow(key=key, label=label.strip(), entries=tuple(parsed)))
+        rows.append(IrlRow(key=key, label=label.strip(), entries=tuple(parsed)))
     if not rows:
-        raise RuntimeError("At least one Star row is required")
+        raise RuntimeError("At least one IRL row is required")
     return tuple(rows)
 
 
@@ -197,17 +199,22 @@ def load_config() -> Config:
         lesson_files, {category.key for category in categories}
     )
     protocol = MappingProxyType(load_protocol(protocol_path))
-    star_rows = _load_star_rows(config_dir, categories)
-    for row in star_rows:
+    curriculum = load_curriculum(
+        lesson_files,
+        lessons,
+        {category.key for category in categories},
+    )
+    irl_rows = _load_irl_rows(config_dir, categories)
+    for row in irl_rows:
         for skill, lesson_id in row.entries:
             lesson = lessons.get(lesson_id)
             if lesson is None:
                 raise RuntimeError(
-                    f"Star row {row.label!r} points to missing lesson {lesson_id!r}"
+                    f"IRL row {row.label!r} points to missing lesson {lesson_id!r}"
                 )
             if lesson.skill != skill:
                 raise RuntimeError(
-                    f"Star row {row.label!r} maps {skill!r} to {lesson_id!r}, "
+                    f"IRL row {row.label!r} maps {skill!r} to {lesson_id!r}, "
                     f"which belongs to {lesson.skill!r}"
                 )
 
@@ -220,6 +227,7 @@ def load_config() -> Config:
         policies=MappingProxyType(policies),
         lesson_bytes=MappingProxyType(lesson_files),
         entries=MappingProxyType(entries),
-        star_rows=star_rows,
+        irl_rows=irl_rows,
         protocol=protocol,
+        curriculum=curriculum,
     )

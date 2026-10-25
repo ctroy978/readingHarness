@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, quote
@@ -11,11 +12,16 @@ from starlette.responses import HTMLResponse, JSONResponse, Response
 from starlette.routing import Route
 
 from server.config import Config, load_config
+from server.alerts import format_gap_alert, load_alert_settings, send_gap_alert
+from server.progression import ProgressionError, ProgressionResult, select_next_lesson
 from server.tickets import (
+    HoldTicket,
     TicketError,
     choose_route,
     make_ticket,
+    make_hold_ticket,
     parse_completion_line,
+    verify_hold_ticket,
     verify_ticket,
 )
 
@@ -47,7 +53,7 @@ def _invalid(status: int = 400) -> HTMLResponse:
 def _unavailable() -> HTMLResponse:
     return _page(
         "Lesson not available",
-        '<p>Lesson not available for that Star score and lesson type.</p><p><a href="/">Choose another lesson</a></p>',
+        '<p>Lesson not available for that band and lesson type.</p><p><a href="/">Choose another lesson</a></p>',
     )
 
 
@@ -73,6 +79,16 @@ def _signed_page(url: str) -> HTMLResponse:
     )
 
 
+def _hold_page(url: str) -> HTMLResponse:
+    escaped = html.escape(url, quote=True)
+    return _page(
+        "Lesson held",
+        f"""<p>Your work is saved. Your teacher has been alerted that this band needs more lessons.</p>
+<p>Come back in two days and open the same link. If the lessons are ready, you will get the next one.</p>
+<p><a href="{escaped}">Check this link again</a></p>""",
+    )
+
+
 def _serve(config: Config, lesson, status_on_missing: int = 404) -> Response | HTMLResponse:
     content = config.lesson_bytes.get(lesson.filename)
     if content is None:
@@ -87,19 +103,46 @@ def _serve(config: Config, lesson, status_on_missing: int = 404) -> Response | H
     )
 
 
-def _sign_line(config: Config, line: str) -> str:
-    completion = parse_completion_line(line, config.lesson, config.policies)
+def _resolve(config: Config, completion) -> ProgressionResult:
     policy = config.policies[completion.lesson.id]
     routing = config.protocol["routing"]
     route = choose_route(completion, policy, routing["advance_min_got_there"])
-    lesson = config.lesson(route.next_file)
-    if lesson is None:
-        raise TicketError("Unknown lesson")
+    try:
+        return select_next_lesson(
+            completion,
+            config.curriculum,
+            config.lessons,
+            config.protocol["progression"],
+            routing["advance_min_got_there"],
+            route.next_file,
+        )
+    except ProgressionError as exc:
+        raise TicketError("Invalid progression") from exc
+
+
+def _next_url(config: Config, lesson, available_at=None) -> str:
+    now = datetime.now(timezone.utc)
+    ticket = make_ticket(
+        lesson,
+        config.secret,
+        issued_at=now,
+        available_at=available_at or now,
+    )
+    return f"{config.public_base_url}/next?t={quote(ticket, safe='')}"
+
+
+def _sign_line(config: Config, line: str) -> str:
+    completion = parse_completion_line(line, config.lesson, config.policies)
+    result = _resolve(config, completion)
+    if result.held:
+        return _hold_url(config, completion, result)
+    if result.lesson is None:
+        raise TicketError("Missing progression lesson")
     now = datetime.now(timezone.utc)
     pace_days = config.protocol["pace_days"]
     available_at = now if completion.stopped else now + timedelta(days=pace_days)
     ticket = make_ticket(
-        lesson,
+        result.lesson,
         config.secret,
         issued_at=now,
         available_at=available_at,
@@ -107,13 +150,36 @@ def _sign_line(config: Config, line: str) -> str:
     return f"{config.public_base_url}/next?t={quote(ticket, safe='')}"
 
 
+def _hold_url(config: Config, completion, result: ProgressionResult) -> str:
+    hold_ticket = make_hold_ticket(completion, config.secret)
+    hold_id = hashlib.sha256(hold_ticket.encode()).hexdigest()[:16]
+    if result.hold_set is not None:
+        current_set = result.hold_set
+        missing = tuple(
+            sequence
+            for sequence in current_set.expected_sequences
+            if config.lesson(
+                f"{current_set.skill}_band_{current_set.grade}_{current_set.stage}_{sequence:04d}"
+            )
+            is None
+        )
+        subject, text = format_gap_alert(
+            current_set,
+            completion.lesson.id,
+            missing,
+            hold_id,
+        )
+        send_gap_alert(load_alert_settings(), subject, text)
+    return f"{config.public_base_url}/resume?h={quote(hold_ticket, safe='')}"
+
+
 def create_app(config: Config | None = None) -> Starlette:
     config = config or load_config()
 
     async def onboarding(request: Request) -> HTMLResponse:
-        score_options = "".join(
+        band_options = "".join(
             f'<option value="{html.escape(row.key, quote=True)}">{html.escape(row.label)}</option>'
-            for row in config.star_rows
+            for row in config.irl_rows
         )
         type_options = "".join(
             f'<option value="{html.escape(category.key, quote=True)}">{html.escape(category.label)}</option>'
@@ -123,12 +189,12 @@ def create_app(config: Config | None = None) -> Starlette:
             "Reading program",
             f"""<p>This is a reading program. You will get one lesson at a time.</p>
 <form method="get" action="/start">
-<label for="star">Star score</label><select id="star" name="star" required>{score_options}</select>
+<label for="band">Reading band</label><select id="band" name="band" required>{band_options}</select>
 <label for="skill">Lesson type</label><select id="skill" name="skill" required>{type_options}</select>
 <button type="submit">Find my starting lesson</button>
 </form>
 <h2>What to do</h2><ol>
-<li>Choose your Star score and lesson type. Your starting lesson will download.</li>
+<li>Choose your reading band and lesson type. Your starting lesson will download.</li>
 <li>Open your AI. Upload the file. Type <code>begin</code>.</li>
 <li>When the lesson ends, the AI will give you a ticket line. <a href="/finish">Paste it on the finish page</a>.</li>
 <li>The server will choose your next lesson and show when it unlocks. Bookmark the link. Do not edit it.</li>
@@ -137,12 +203,12 @@ def create_app(config: Config | None = None) -> Starlette:
 
     async def start(request: Request):
         skill = request.query_params.get("skill")
-        star = request.query_params.get("star")
-        if star is not None:
-            row = config.star_row(star)
+        band = request.query_params.get("band")
+        if band is not None:
+            row = config.irl_row(band)
             if row is None or not skill or skill not in {category.key for category in config.categories}:
                 return _invalid()
-            lesson = config.star_entry(star, skill)
+            lesson = config.irl_entry(band, skill)
             return _serve(config, lesson) if lesson is not None else _unavailable()
         # Later lessons are reachable only through a server-selected, signed link.
         return _invalid()
@@ -197,6 +263,22 @@ def create_app(config: Config | None = None) -> Starlette:
             )
         return _serve(config, ticket.lesson)
 
+    async def resume(request: Request):
+        h = request.query_params.get("h")
+        if not h:
+            return _invalid()
+        try:
+            ticket = verify_hold_ticket(h, config.secret, config.lesson, config.policies)
+        except TicketError:
+            return _invalid()
+        try:
+            result = _resolve(config, ticket.completion)
+        except TicketError:
+            return _invalid()
+        if result.held or result.lesson is None:
+            return _hold_page(f"{config.public_base_url}/resume?h={quote(h, safe='')}")
+        return _signed_page(_next_url(config, result.lesson))
+
     async def health(request: Request):
         return JSONResponse({"ok": True})
 
@@ -208,6 +290,7 @@ def create_app(config: Config | None = None) -> Starlette:
             Route("/finish", finish),
             Route("/finish", finish_post, methods=["POST"]),
             Route("/next", next_lesson),
+            Route("/resume", resume),
             Route("/health", health),
         ]
     )

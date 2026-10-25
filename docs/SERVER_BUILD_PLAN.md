@@ -4,7 +4,7 @@ Updated: 2026-10-18
 Status: Implemented
 
 This is the build plan for the stateless FastAPI service that distributes lesson JSON files,
-supports onboarding, and enforces 3-day pacing. It incorporates the expanded onboarding,
+supports onboarding, and enforces one-day pacing. It incorporates the expanded onboarding,
 bookmark, signing, and privacy requirements.
 
 ## 1. Outcome
@@ -32,7 +32,7 @@ will use these resolutions:
 1. **The clock starts at `/sign`, not `/start`.** `/start` only downloads an entry lesson.
    A signed ticket cannot begin its wait at `/start` if `/start` does not expose that ticket.
    When the student submits the AI's unsigned exit line to `/sign`, the server stamps
-   `issued_at = now`, signs the ticket, and starts the 3-day wait. This follows the final,
+   `issued_at = now`, signs the ticket, and starts the one-day wait. This follows the final,
    explicit `/start` instruction and removes the unused ticket.
 
 2. **Signed tickets contain only routing and pacing data.** The canonical payload is:
@@ -334,7 +334,7 @@ between the AI's unsigned output and the server's signed `/next` URL.
 1. Verify length, payload shape, HMAC, skill, level, lesson ID, timestamp, and nonce.
 2. On any signature or payload failure, return the plain invalid-link page with HTTP 400.
 3. Resolve the exact lesson ID through the catalog and confirm its skill and level agree.
-4. Compute `available_at = issued_at + 3 days` using timezone-aware UTC values.
+4. Compute `available_at = issued_at + 1 day` using timezone-aware UTC values.
 5. If `now < available_at`, return the "Not yet" page with HTTP 200. Do not serve the file and do
    not change the ticket.
 6. If `now >= available_at`, serve the catalog entry's filename as an attachment.
@@ -407,7 +407,7 @@ duplicate rejection, category additions, and a synthetic category with more than
 | Sequence order | Levels and sequences are compared numerically; `10` follows `9`, and `1000` is accepted. |
 | Signing | Valid unsigned line with an exact catalog lesson returns a signed URL; tampering and unknown lesson IDs fail. |
 | Fresh ticket | Fixed clock returns 200 "Not yet", exact availability time, and no file. |
-| Mature ticket | Fixed clock at or beyond 3 days serves the file; a second request serves it again. |
+| Mature ticket | Fixed clock at or beyond 1 day serves the file; a second request serves it again. |
 | Tampered ticket | Changed payload or signature returns the invalid-link page and no file. |
 | Path traversal | Malicious `skill`, `level`, `lesson`, or signed payload shape is rejected before filesystem access. |
 | No cookies | All route tests assert `Set-Cookie` is absent. |
@@ -416,7 +416,7 @@ duplicate rejection, category additions, and a synthetic category with more than
 | Privacy | Tests check ticket parsing has no identity fields and app code has no request logging hooks. |
 | Chromebook usability | Manual check of pages and downloads in a browser with default settings and JavaScript disabled. |
 
-Also test the exact boundary at `issued_at + 3 days`, future timestamps, duplicate fields,
+Also test the exact boundary at `issued_at + 1 day`, future timestamps, duplicate fields,
 overlong tickets, missing lesson files, a missing catalog entry, and startup rejection for an
 invalid category registry, catalog, or onboarding table.
 
@@ -443,7 +443,7 @@ Add `docs/TEACHER_GUIDE.md` with:
 - how to change entry thresholds;
 - what to tell students at each step;
 - what to do when a student has no Star data by sending the placement lesson directly;
-- that the 3-day gate is a pacing norm rather than enforcement;
+- that the one-day gate is a pacing norm rather than enforcement;
 - that re-running a lesson or submitting a new exit line resets the clock, which the teacher
   monitors;
 - that sharing a link lets another person use that pacing window.

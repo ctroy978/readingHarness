@@ -1,74 +1,24 @@
 {
-  "star_rows": [
-    {
-      "key": "900-999",
-      "label": "900-999",
-      "entries": {
-        "vocab": "vocab_L900_0001",
-        "main_idea": "main_idea_L900_0001",
-        "inference": "inference_L900_0001",
-        "process": "process_L900_0001",
-        "text_structure": "text_structure_L900_0001",
-        "literary_text": "literary_text_L900_0001",
-        "authors_craft": "authors_craft_L900_0001",
-        "argument_evidence": "argument_evidence_L900_0001"
-      }
-    },
-    {
-      "key": "1000-1099",
-      "label": "1000-1099",
-      "entries": {
-        "vocab": "vocab_L1000_0001",
-        "main_idea": "main_idea_L1000_0001",
-        "inference": "inference_L1000_0001",
-        "process": "process_L1000_0001",
-        "text_structure": "text_structure_L1000_0001",
-        "literary_text": "literary_text_L1000_0001",
-        "authors_craft": "authors_craft_L1000_0001",
-        "argument_evidence": "argument_evidence_L1000_0001"
-      }
-    },
-    {
-      "key": "1100-1199",
-      "label": "1100-1199",
-      "entries": {
-        "vocab": "vocab_L1100_0001",
-        "main_idea": "main_idea_L1100_0001",
-        "inference": "inference_L1100_0001",
-        "process": "process_L1100_0001",
-        "text_structure": "text_structure_L1100_0001",
-        "literary_text": "literary_text_L1100_0001",
-        "authors_craft": "authors_craft_L1100_0001",
-        "argument_evidence": "argument_evidence_L1100_0001"
-      }
-    },
-    {
-      "key": "1200-1299",
-      "label": "1200-1299",
-      "entries": {
-        "vocab": "vocab_L1200_0001",
-        "main_idea": "main_idea_L1200_0001",
-        "inference": "inference_L1200_0001",
-        "process": "process_L1200_0001",
-        "text_structure": "text_structure_L1200_0001",
-        "literary_text": "literary_text_L1200_0001",
-        "authors_craft": "authors_craft_L1200_0001",
-        "argument_evidence": "argument_evidence_L1200_0001"
-      }
-    },
-    {
-      "key": "1300-1400",
-      "label": "1300-1400",
-      "entries": {
-        "vocab": "vocab_L1300_0001",
-        "main_idea": "main_idea_L1300_0001",
-        "inference": "inference_L1300_0001",
-        "process": "process_L1300_0001",
-        "text_structure": "text_structure_L1300_0001",
-        "literary_text": "literary_text_L1300_0001",
-        "authors_craft": "authors_craft_L1300_0001",
-        "argument_evidence": "argument_evidence_L1300_0001"
-      }
-    }
+  "irl_rows": [
+    {"key": "3.1", "label": "Band 3.1", "entries": {}},
+    {"key": "4.1", "label": "Band 4.1", "entries": {}},
+    {"key": "5.1", "label": "Band 5.1", "entries": {
+      "inference": "inference_band_5_1_0001"
+    }},
+    {"key": "6.1", "label": "Band 6.1", "entries": {
+      "inference": "inference_band_6_1_0001"
+    }},
+    {"key": "7.1", "label": "Band 7.1", "entries": {
+      "main_idea": "main_idea_band_7_1_0001"
+    }},
+    {"key": "8.1", "label": "Band 8.1", "entries": {}},
+    {"key": "9.1", "label": "Band 9.1", "entries": {
+      "process": "process_band_9_1_0001"
+    }},
+    {"key": "10.1", "label": "Band 10.1", "entries": {
+      "process": "process_band_10_1_0001"
+    }},
+    {"key": "11.1", "label": "Band 11.1", "entries": {}},
+    {"key": "12.1", "label": "Band 12.1", "entries": {}}
   ]
 }

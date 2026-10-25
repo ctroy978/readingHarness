@@ -1,8 +1,13 @@
 {
   "version": "1.0",
-  "pace_days": 3,
+  "pace_days": 1,
   "routing": {
     "advance_min_got_there": 4
+  },
+  "progression": {
+    "on_incomplete_set": "hold_and_alert",
+    "on_ceiling": "hold",
+    "on_floor": "restart_set"
   },
   "results": {
     "unaided": "The accepted idea was in the student's first answer, before any help question.",

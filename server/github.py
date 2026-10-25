@@ -44,7 +44,9 @@ def parse_lesson_files(archive: bytes, lesson_path: str = "") -> dict[str, bytes
                         relative = relative.relative_to(prefix)
                     except ValueError:
                         continue
-                if len(relative.parts) != 1 or not LESSON_NAME.fullmatch(relative.name):
+                if len(relative.parts) != 1:
+                    continue
+                if relative.name != "curriculum.json" and not LESSON_NAME.fullmatch(relative.name):
                     continue
                 if relative.name in files:
                     raise RuntimeError(f"Duplicate lesson filename in GitHub archive: {relative.name}")

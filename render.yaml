@@ -21,3 +21,11 @@ services:
         value: lessons
       - key: DISPLAY_TIMEZONE
         value: UTC
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        sync: false
+      - key: RESEND_REPLY_TO
+        sync: false
+      - key: ALERT_EMAIL_TO
+        sync: false

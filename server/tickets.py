@@ -25,6 +25,12 @@ class Ticket:
 
 
 @dataclass(frozen=True)
+class HoldTicket:
+    completion: Completion
+    issued_at: datetime
+
+
+@dataclass(frozen=True)
 class Completion:
     lesson: Lesson
     done: int
@@ -108,6 +114,75 @@ def parse_completion_line(line: str, lookup, policies) -> Completion:
     if stop is not None and stop != "1":
         raise TicketError("Invalid stop value")
     return Completion(lesson=lesson, done=done, got_there=got_there, stopped=stop == "1")
+
+
+def make_hold_ticket(
+    completion: Completion,
+    secret: bytes,
+    issued_at: datetime | None = None,
+) -> str:
+    issued_at = (issued_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    issued_at = issued_at.replace(microsecond=0)
+    stop = "1" if completion.stopped else "0"
+    payload = (
+        f"v0|hold=1|from={completion.lesson.id}|done={completion.done}|"
+        f"got_there={completion.got_there}|stop={stop}|"
+        f"issued={issued_at.strftime('%Y-%m-%dT%H:%M:%SZ')}|"
+        f"nonce={secrets.token_urlsafe(12)}"
+    )
+    return _sign(payload, secret)
+
+
+def verify_hold_ticket(
+    ticket: str,
+    secret: bytes,
+    lookup,
+    policies,
+) -> HoldTicket:
+    if not isinstance(ticket, str) or len(ticket) > TICKET_LIMIT:
+        raise TicketError("Invalid hold ticket")
+    payload, separator, signature = ticket.rpartition(".")
+    if not separator or not payload or not SIGNATURE.fullmatch(signature):
+        raise TicketError("Invalid hold ticket")
+    expected = hmac.new(secret, payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(signature, expected):
+        raise TicketError("Invalid hold ticket")
+    parts = payload.split("|")
+    if len(parts) != 8 or parts[0] != "v0" or parts[1] != "hold=1":
+        raise TicketError("Invalid hold ticket")
+    prefixes = ("from=", "done=", "got_there=", "stop=", "issued=", "nonce=")
+    if any(not part.startswith(prefix) for part, prefix in zip(parts[2:], prefixes)):
+        raise TicketError("Invalid hold ticket")
+    lesson = lookup(parts[2][len("from=") :])
+    if lesson is None or lesson.id not in policies:
+        raise TicketError("Unknown lesson")
+    try:
+        done = int(parts[3][len("done=") :])
+        got_there = int(parts[4][len("got_there=") :])
+        stop = parts[5][len("stop=") :]
+        issued_at = datetime.strptime(
+            parts[6][len("issued=") :], "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise TicketError("Invalid hold ticket") from exc
+    policy = policies[lesson.id]
+    if stop not in {"0", "1"} or done < 0 or got_there < 0:
+        raise TicketError("Invalid hold ticket")
+    if done > policy.item_count or got_there > done:
+        raise TicketError("Invalid hold ticket")
+    if not parts[7][len("nonce=") :]:
+        raise TicketError("Invalid hold ticket")
+    if issued_at > datetime.now(timezone.utc) + timedelta(minutes=5):
+        raise TicketError("Invalid hold ticket")
+    return HoldTicket(
+        completion=Completion(
+            lesson=lesson,
+            done=done,
+            got_there=got_there,
+            stopped=stop == "1",
+        ),
+        issued_at=issued_at,
+    )
 
 
 def choose_route(completion: Completion, policy: LessonPolicy, advance_min: int):

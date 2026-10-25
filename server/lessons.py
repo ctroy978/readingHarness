@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from server.catalog import LESSON_NAME
+
 
 class LessonBuildError(RuntimeError):
     pass
@@ -48,9 +50,9 @@ def _route(
     if not isinstance(value, dict):
         raise LessonBuildError(f"Lesson source needs a {destination!r} route")
     next_file = _require_string(value, "next_file")
-    next_level = value.get("next_level")
-    if not isinstance(next_level, int) or next_level < 1:
-        raise LessonBuildError(f"{destination!r} route needs a positive next_level")
+    next_irl = value.get("next_irl")
+    if not isinstance(next_irl, int) or next_irl < 1:
+        raise LessonBuildError(f"{destination!r} route needs a positive next_irl")
     next_means = _require_string(value, "next_means")
     student_line = value.get("student_line")
     if kind == "stopped":
@@ -61,7 +63,7 @@ def _route(
             raise LessonBuildError(f"{destination!r} route needs a student_line")
     return {
         "next_file": next_file,
-        "next_level": next_level,
+        "next_irl": next_irl,
         "next_means": next_means,
         "student_line": student_line,
     }
@@ -71,9 +73,23 @@ def compile_lesson(source: Mapping[str, Any], protocol: Mapping[str, Any]) -> di
     if source.get("schema_version") != 3 or source.get("document_type") != "lesson_source":
         raise LessonBuildError("Lesson source must use schema_version 3 and lesson_source")
     lesson_id = _require_string(source, "lesson_id")
+    match = LESSON_NAME.fullmatch(f"{lesson_id}.json")
+    if match is None:
+        raise LessonBuildError(
+            "lesson_id must use <skill>_band_<grade>_<stage>_<sequence>"
+        )
     meta = source.get("meta")
     if not isinstance(meta, dict):
         raise LessonBuildError("Lesson source needs meta")
+    skill = match["skill"]
+    irl_grade = int(match["irl"])
+    stage = int(match["stage"])
+    sequence = int(match["sequence"])
+    if meta.get("skill") != skill:
+        raise LessonBuildError("Lesson meta.skill must match the filename")
+    reader = meta.get("reader")
+    if not isinstance(reader, dict) or reader.get("reading_level") != irl_grade:
+        raise LessonBuildError("Lesson reader.reading_level must equal the IRL grade")
     items = source.get("items")
     if not isinstance(items, list) or not items:
         raise LessonBuildError("Lesson source needs at least one item")
@@ -86,11 +102,16 @@ def compile_lesson(source: Mapping[str, Any], protocol: Mapping[str, Any]) -> di
     routes = _route(source, "advance", "route")
     retry = _route(source, "retry", "route")
     stopped = _route(source, "stopped", "stopped")
+    runtime_meta = copy.deepcopy(meta)
+    runtime_meta.pop("reader", None)
+    runtime_meta.pop("irl_grade", None)
+    runtime_meta.pop("stage", None)
+    runtime_meta.pop("sequence", None)
     result: dict[str, Any] = {
         "schema_version": 3,
         "document_type": "reading_lesson",
         "lesson_id": lesson_id,
-        "meta": copy.deepcopy(meta),
+        "meta": runtime_meta,
     }
     result["meta"]["protocol_version"] = protocol["version"]
     for key in ("passage", "items"):

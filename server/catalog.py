@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Mapping
 
 LESSON_NAME = re.compile(
-    r"^(?P<skill>[a-z][a-z0-9_-]*)_L(?P<level>\d+)_(?P<sequence>\d+)\.json$"
+    r"^(?P<skill>[a-z][a-z0-9_-]*)_band_(?P<irl>\d{1,2})_(?P<stage>[1-8])_(?P<sequence>\d{4})\.json$"
 )
 
 
@@ -21,7 +21,8 @@ class Category:
 @dataclass(frozen=True)
 class Lesson:
     skill: str
-    level: int
+    irl: int
+    stage: int
     sequence: int
     filename: str
 
@@ -29,11 +30,16 @@ class Lesson:
     def id(self) -> str:
         return self.filename.removesuffix(".json")
 
+    @property
+    def level(self) -> int:
+        """The ticket field remains `level`; its value is the IRL grade."""
+        return self.irl
+
 
 @dataclass(frozen=True)
 class Route:
     next_file: str
-    next_level: int
+    next_irl: int
 
 
 @dataclass(frozen=True)
@@ -53,12 +59,12 @@ def _route(value: object, filename: str, name: str) -> Route:
     if not isinstance(value, dict):
         raise RuntimeError(f"Lesson {filename} needs rules.server_routes.{name}")
     next_file = value.get("next_file")
-    next_level = value.get("next_level")
+    next_irl = value.get("next_irl")
     if not isinstance(next_file, str) or not next_file:
         raise RuntimeError(f"Lesson {filename} has an invalid {name} destination")
-    if not isinstance(next_level, int) or next_level < 1:
-        raise RuntimeError(f"Lesson {filename} has an invalid {name} level")
-    return Route(next_file=next_file, next_level=next_level)
+    if not isinstance(next_irl, int) or next_irl < 1:
+        raise RuntimeError(f"Lesson {filename} has an invalid {name} IRL grade")
+    return Route(next_file=next_file, next_irl=next_irl)
 
 
 def _load_policy(data: Mapping[str, object], filename: str) -> LessonPolicy | None:
@@ -96,36 +102,55 @@ def build_catalog(
         if match is None:
             continue
         skill = match["skill"]
-        level = int(match["level"])
+        irl = int(match["irl"])
+        stage = int(match["stage"])
         sequence = int(match["sequence"])
         if skill not in allowed_skills:
             raise RuntimeError(f"Lesson uses unknown category {skill!r}: {filename}")
-        if level < 1:
-            raise RuntimeError(f"Lesson level must be positive: {filename}")
+        if not 1 <= irl <= 12:
+            raise RuntimeError(f"Lesson IRL grade must be between 1 and 12: {filename}")
         try:
             data = json.loads(content.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise RuntimeError(f"Invalid lesson JSON: {filename}") from exc
         if not isinstance(data, dict):
             raise RuntimeError(f"Lesson must be a JSON object: {filename}")
+        meta = data.get("meta")
+        is_compiled = data.get("schema_version") == 3
+        if is_compiled:
+            if not isinstance(meta, dict):
+                raise RuntimeError(f"Schema-v3 lesson needs meta: {filename}")
+            expected_placement = {"skill": skill}
+            for key, expected in expected_placement.items():
+                if meta.get(key) != expected:
+                    raise RuntimeError(
+                        f"Lesson {filename} meta.{key} must be {expected!r}"
+                    )
+
         lesson_id = data.get("lesson_id")
         if lesson_id is not None and lesson_id != Path(filename).stem:
             raise RuntimeError(f"lesson_id does not match filename: {filename}")
-        status = data.get("meta", {}).get("status") if isinstance(data.get("meta"), dict) else None
+        status = meta.get("status") if isinstance(meta, dict) else None
         if status == "draft":
             raise RuntimeError(f"Draft lesson cannot be published: {filename}")
 
-        lesson = Lesson(skill=skill, level=level, sequence=sequence, filename=filename)
+        lesson = Lesson(
+            skill=skill,
+            irl=irl,
+            stage=stage,
+            sequence=sequence,
+            filename=filename,
+        )
         if lesson.id in lessons:
             raise RuntimeError(f"Duplicate lesson: {lesson.id}")
         lessons[lesson.id] = lesson
         policy = _load_policy(data, filename)
         if policy is not None:
             policies[lesson.id] = policy
-        groups.setdefault((skill, level), []).append(lesson)
+        groups.setdefault((skill, irl), []).append(lesson)
 
     entries = {
-        key: tuple(sorted(group, key=lambda lesson: lesson.sequence))
+        key: tuple(sorted(group, key=lambda lesson: (lesson.stage, lesson.sequence)))
         for key, group in groups.items()
     }
     for lesson_id, policy in policies.items():
@@ -139,8 +164,8 @@ def build_catalog(
                 raise RuntimeError(
                     f"Lesson {lesson_id} points to missing lesson {route.next_file!r}"
                 )
-            if destination.level != route.next_level:
+            if destination.irl != route.next_irl:
                 raise RuntimeError(
-                    f"Lesson {lesson_id} route level does not match {route.next_file!r}"
+                    f"Lesson {lesson_id} route IRL does not match {route.next_file!r}"
                 )
     return lessons, entries, policies

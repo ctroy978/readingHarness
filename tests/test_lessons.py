@@ -18,13 +18,15 @@ def source():
     return {
         "schema_version": 3,
         "document_type": "lesson_source",
-        "lesson_id": "inference_L1000_0002",
+        "lesson_id": "inference_band_5_1_0002",
         "meta": {
             "status": "published",
             "title": "Example",
             "skill": "inference",
-            "level": 1000,
+            "irl_grade": 5,
+            "stage": 1,
             "sequence": 2,
+            "reader": {"reading_level": 5},
         },
         "script_overrides": {
             "near_copy_2": "Start with the shelf. One sentence is enough."
@@ -33,20 +35,20 @@ def source():
         "passage": {"part_1": "Example passage."},
         "items": [{"id": "q1"}, {"id": "q2"}],
         "advance": {
-            "next_file": "inference_L1100_0001",
-            "next_level": 1100,
+            "next_file": "inference_band_6_1_0001",
+            "next_irl": 6,
             "next_means": "Higher band.",
             "student_line": "Advance.",
         },
         "retry": {
-            "next_file": "inference_L1000_0003",
-            "next_level": 1000,
+            "next_file": "inference_band_5_1_0003",
+            "next_irl": 5,
             "next_means": "Same band.",
             "student_line": "Retry.",
         },
         "stopped": {
-            "next_file": "inference_L1000_0002",
-            "next_level": 1000,
+            "next_file": "inference_band_5_1_0002",
+            "next_irl": 5,
             "next_means": "Resume.",
         },
     }
@@ -60,7 +62,14 @@ def test_compiler_uses_shared_protocol_and_lesson_overrides(protocol, source):
     assert lesson["tutoring_instructions"][-1] == source["instruction_additions"][0]
     assert "q2" in "\n".join(lesson["tutoring_instructions"])
     assert lesson["rules"]["token_done"].startswith("v1|from={lesson_id}")
-    assert lesson["rules"]["server_routes"]["advance"]["next_file"] == "inference_L1100_0001"
+    assert lesson["rules"]["server_routes"]["advance"]["next_file"] == "inference_band_6_1_0001"
+    assert lesson["meta"].get("reader") is None
+
+
+def test_compiler_rejects_metadata_that_disagrees_with_filename(protocol, source):
+    source["meta"]["reader"]["reading_level"] = 6
+    with pytest.raises(LessonBuildError, match="reading_level"):
+        compile_lesson(source, protocol)
 
 
 def test_compiler_rejects_unknown_script_override(protocol, source):
