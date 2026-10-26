@@ -139,8 +139,8 @@ The primary difficulty knobs are:
 - similarity and plausibility of distractors;
 - number of rubric points or multi-part requirements.
 
-Levels within one skill should be comparable in what they increase. For example, an inference
-L2 file should generally increase clue distance or distractor similarity, not also introduce
+Sequences and stages within one skill should be comparable in what they increase. For example, a
+later inference sequence should generally increase clue distance or distractor similarity, not also introduce
 an unfamiliar genre, a much longer passage, and a new response format at the same time.
 
 Record the intended progression in `meta.session.difficulty_basis` and the level rationale in
@@ -550,26 +550,26 @@ deterministic build artifact:
 {
   "schema_version": 3,
   "document_type": "lesson_source",
-  "lesson_id": "inference_L1000_0002",
+  "lesson_id": "inference_band_5_2_0003",
   "meta": {},
   "script_overrides": {"near_copy_2": "Lesson-specific say-back prompt."},
   "passage": {},
   "items": [],
   "advance": {
-    "next_file": "inference_L1100_0001",
-    "next_level": 1100,
-    "next_means": "The next band entry.",
+    "next_file": "inference_band_6_1_0001",
+    "next_irl": 6,
+    "next_means": "The entry lesson for the next inference grade.",
     "student_line": "Student-facing transition."
   },
   "retry": {
-    "next_file": "inference_L1000_0003",
-    "next_level": 1000,
-    "next_means": "Another lesson in this band.",
+    "next_file": "inference_band_5_2_0004",
+    "next_irl": 5,
+    "next_means": "Another lesson in this stage.",
     "student_line": "Student-facing transition."
   },
   "stopped": {
-    "next_file": "inference_L1000_0002",
-    "next_level": 1000,
+    "next_file": "inference_band_5_2_0003",
+    "next_irl": 5,
     "next_means": "Resume this lesson."
   }
 }
@@ -585,22 +585,20 @@ existing field names should not silently change meaning.
 {
   "schema_version": 3,
   "document_type": "reading_lesson",
-  "lesson_id": "inference_L1_001",
+  "lesson_id": "inference_band_5_2_0003",
   "meta": {
     "status": "draft | reviewed | published",
     "title": "Student-facing title",
     "skill": "inference",
-    "level": 1,
     "skill_frame": "Optional student-facing description of what this lesson practices.",
-    "reader": {},
     "source": {},
     "session": {
       "scope": "prototype | bank",
-      "item_target": 12,
-      "time_target_minutes": 18,
+      "item_target": 5,
+      "time_target_minutes": 12,
       "difficulty_basis": "What changes at this level."
     },
-    "protocol_version": "0.1",
+    "protocol_version": "1.0",
     "authoring_exceptions": []
   },
   "script": {},
@@ -754,9 +752,9 @@ reports only the current lesson and outcome counts.
 ```json
 {
   "server_routes": {
-    "advance": {"next_level": 3, "next_file": "skill_L3_001.json"},
-    "retry": {"next_level": 2, "next_file": "skill_L2_002.json"},
-    "stopped": {"next_level": 2, "next_file": "skill_L2_001.json"}
+    "advance": {"next_irl": 6, "next_file": "inference_band_6_1_0001"},
+    "retry": {"next_irl": 5, "next_file": "inference_band_5_2_0004"},
+    "stopped": {"next_irl": 5, "next_file": "inference_band_5_2_0003"}
   },
   "token_done": "Authored one-line token template.",
   "token_stopped": "Authored one-line stopped-token template."
@@ -770,19 +768,21 @@ the next file.
 
 ## 12. Naming and bank layout
 
-Use one file per skill and level, with a stable sequence suffix:
+Use one file per category, grade, stage, and sequence:
 
-`<skill>_L<level>_<sequence>.json`
+`<category>_band_<grade>_<stage>_<sequence>.json`
 
-Examples: `inference_L1_001.json`, `inference_L1_002.json`, `process_L2_001.json`.
+Examples: `inference_band_5_1_0001.json`, `inference_band_5_1_0002.json`,
+`process_band_9_1_0001.json`.
 
-`START_HERE.json` is the placement lesson. A manifest may list skill, level, filename, and
-prerequisite, but routing remains server-side. Do not encode a student's identity in a file
-name.
+`_0001` is the entry lesson for a stage and is the only ID an onboarding Band key may name.
+`lessons/curriculum.json` declares each set's expected sequences and whether it is complete.
+Routing remains server-side, and every lesson's three authored destinations must point at
+existing lessons. Do not encode a student's identity in a file name.
 
 ## 13. Authoring workflow
 
-1. Choose one skill and one level.
+1. Choose one category, grade, stage, and sequence.
 2. Write the student-facing promise and the session limit.
 3. Source or draft the passage.
 4. Write the item set and the scoring key.
@@ -829,7 +829,7 @@ At minimum, a validator should check:
 
 - valid JSON and supported `schema_version`;
 - unique item IDs;
-- one declared primary skill and level;
+- one declared primary skill and a Band identity that matches the filename;
 - every `show_part` names an existing passage key;
 - `skill_frame`, if present, is a non-empty string;
 - every item has a key, a `tell`, and at least one help when help is allowed;
@@ -837,7 +837,8 @@ At minimum, a validator should check:
 - every rejected cloze word has a branch or a stated generic rule;
 - every multiple-choice distractor has a reason;
 - every rubric threshold is arithmetically possible;
-- every advance, retry, and stopped destination exists and has the matching level;
+- every advance, retry, and stopped destination exists and has the matching `next_irl` grade;
+- every lesson belongs to a set declared in `curriculum.json`, and every `complete` set is whole;
 - shared route thresholds are applied by the server;
 - the token template contains no PII fields and no invented signature;
 - the tutor instructions contain the shared core;

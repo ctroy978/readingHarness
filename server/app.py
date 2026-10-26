@@ -195,7 +195,7 @@ def create_app(config: Config | None = None) -> Starlette:
 </form>
 <h2>What to do</h2><ol>
 <li>Choose your reading band and lesson type. Your starting lesson will download.</li>
-<li>Open your AI. Upload the file. Type <code>begin</code>.</li>
+<li>Open your AI. Upload the file. Type <code>begin</code>. When the lesson asks if you are ready, type <code>yes</code>.</li>
 <li>When the lesson ends, the AI will give you a ticket line. <a href="/finish">Paste it on the finish page</a>.</li>
 <li>The server will choose your next lesson and show when it unlocks. Bookmark the link. Do not edit it.</li>
 </ol><p class="note">Do not share your link. It is yours.</p>""",

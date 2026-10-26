@@ -8,13 +8,20 @@ reading review and the AI review pass.
 - [ ] New lesson source uses `schema_version: 3` and `document_type: lesson_source`.
 - [ ] Generated runtime lesson is built from the source with `scripts/build_lessons.py`.
 - [ ] Source contains no copied shared protocol, script, result, or token text.
-- [ ] `lesson_id` is unique and stable.
-- [ ] Primary skill and difficulty level are explicit.
+- [ ] `lesson_id` is unique and stable and equals the filename without `.json`.
+- [ ] Primary skill and item difficulty are explicit.
 - [ ] Skill-level framing is in `meta.skill_frame`, `script.ready`, or legacy top-level
   `skill_frame`.
-- [ ] File name follows `<skill>_L<level>_<sequence>.json`.
+- [ ] File name follows `<category>_band_<grade>_<stage>_<sequence>.json`.
+- [ ] Grade is 1-12, stage is 1-8, and sequence is 0001-0008.
+- [ ] `meta.skill` matches the filename category, and `meta.irl_grade`, `meta.stage`, and
+      `meta.sequence` match the filename.
+- [ ] `reader.reading_level` equals the filename grade, and `reader.why_this_level` states both
+      the readability evidence and the cognitive load.
 - [ ] Schema version is supported.
-- [ ] Status is set to `draft`, `reviewed`, or `published`.
+- [ ] Status is `published` for release (`draft` is rejected at server startup).
+- [ ] The set is listed in `lessons/curriculum.json` with its actual `expected_sequences` and an
+      honest `status`; a short set is marked `incomplete`.
 - [ ] Sources and licensing are recorded.
 
 ## Reading design
@@ -56,7 +63,8 @@ reading review and the AI review pass.
 - [ ] `unaided`, `helped`, `mercy`, and `open` are defined.
 - [ ] `got_there` is defined.
 - [ ] Advance, retry, and stopped destinations are explicit and deterministic.
-- [ ] Every destination exists in the catalog and has the matching level.
+- [ ] Every destination exists in the catalog and has the matching `next_irl` grade.
+- [ ] `stopped.next_file` names the current lesson.
 - [ ] Shared thresholds come from `server/config/protocol.json`.
 - [ ] Stop behavior is defined.
 - [ ] Completion token contains the current lesson and counts, not a destination.

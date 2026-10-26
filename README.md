@@ -248,4 +248,5 @@ and a random nonce. The system stores nothing about who the student is.
 
 - [Lesson authoring ruleset](docs/LESSON_AUTHORING_RULESET.md)
 - [Lesson release checklist](docs/LESSON_RELEASE_CHECKLIST.md)
+- [Teacher guide](docs/TEACHER_GUIDE.md)
 - [Server build plan](docs/SERVER_BUILD_PLAN.md)

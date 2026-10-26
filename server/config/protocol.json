@@ -21,6 +21,9 @@
     ],
     "process": [
       "For a multi-part item, require every part. For a cloze item, accept only the listed words and clear misspellings; do not accept a different word."
+    ],
+    "main_idea": [
+      "A main-idea answer must cover the whole passage. A true detail is not the main idea. Accept a paraphrase that states the central idea; use the matching if_they_say line when the student offers a supporting detail or a theme the passage does not state."
     ]
   },
   "scripts": {
