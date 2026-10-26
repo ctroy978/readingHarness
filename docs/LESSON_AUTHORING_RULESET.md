@@ -413,11 +413,15 @@ Recommended defaults:
 - open: move on without trapping the student.
 
 A miss changes what the tutor does within the current item, not which item or lesson the
-student receives next. After `tell` and say-back, record `mercy` or `open` and advance. Choose
-the next lesson only at exit through the server-owned route table.
+student receives next. After `tell` and say-back, record `mercy` or `open` and advance. The server
+chooses the next lesson at exit. The AI reports only the current lesson and the counts.
 
-The server applies the shared thresholds in a fixed order: stopped, advance, then retry. Do not
-depend on a numeric sort that is not stated.
+A stopped session returns the current lesson. While `curriculum.json` marks the set `incomplete`,
+the server does not follow `advance` or `retry`: it serves the next lesson that exists in the band
+and holds at the last one. On a complete set, `got_there` of at least `advance_min_got_there`
+moves to the next stage, and fewer than that moves to the next sequence. The stored destinations
+are used only when `on_incomplete_set` is `authored_route`. The published setting is
+`hold_and_alert`.
 
 ## 8. AI tutoring protocol
 
@@ -577,6 +581,8 @@ deterministic build artifact:
 
 Compile it with `scripts/build_lessons.py`. The generated runtime shape contains the resolved
 `script`, `tutoring_instructions`, and `rules.server_routes` that the server and AI consume.
+Supply `script_overrides.near_copy_2`. The shared instructions tell the tutor to say that line,
+and the shared script list does not define it.
 
 The top level should use a stable shape. Fields may be added with a schema version bump, but
 existing field names should not silently change meaning.
@@ -745,9 +751,16 @@ that the AI invents.
 
 ## 11. Exit rules and routing
 
-The route destinations are the adaptation record. They must be deterministic. The server applies
-the shared thresholds from `protocol.json` and chooses `advance`, `retry`, or `stopped`; the AI
-reports only the current lesson and outcome counts.
+The route destinations are the adaptation record. They must be deterministic, and every
+`next_file` must name a lesson that already exists. The AI reports only the current lesson and
+outcome counts.
+
+The published `hold_and_alert` policy does not serve `advance` or `retry` while the set is
+`incomplete`. The server walks the lessons that exist in the band and holds at the last one.
+Adding the next file and restarting serves that file from the same ticket. On a complete set,
+mastery moves to the first lesson of the next stage, and a result below
+`advance_min_got_there` moves to the next sequence. `stopped` returns the current lesson. The
+stored destinations are followed only when `on_incomplete_set` is `authored_route`.
 
 ```json
 {

@@ -33,9 +33,10 @@ carry the complete location and pacing state.
 
 2. **The server owns route selection.** The AI prints only
    `v1|from=<lesson_id>|done=<n>|got_there=<n>` (plus `|stop=1` when stopping). The server
-   validates the counts, chooses `advance`, `retry`, or `stopped` from the lesson's compiled
-   `rules.server_routes`, resolves the destination against `curriculum.json`, and signs the next
-   link. The AI never names a destination and never signs.
+   validates the counts, resolves the destination against `curriculum.json`, and signs the next
+   link. A stopped session returns the current lesson. While the set is `incomplete`, the server
+   serves the next lesson that exists in the band and holds at the last one. It does not follow
+   the compiled `advance` or `retry` fields. The AI never names a destination and never signs.
 
 3. **Routing is authored, progression is computed.** Each lesson stores three fallback
    destinations, but in a complete curriculum set the server derives the next lesson from the
@@ -47,11 +48,13 @@ carry the complete location and pacing state.
    current lesson and does not move the student.
 
 5. **Incomplete sets hold and alert.** `curriculum.json` marks each set `complete` or
-   `incomplete`. With the default `hold_and_alert` policy, a student who reaches the last
-   authored lesson in a short set is held in place, the server emails `ALERT_EMAIL_TO` through
-   Resend with the category, Band, current lesson, missing sequences, and an opaque hold ID, and
-   the signed `/resume` link re-checks the set later. A set marked `complete` is rejected at
-   startup unless every expected lesson exists.
+   `incomplete`. With the default `hold_and_alert` policy, earlier lessons in a short set still
+   move to the next file that exists. A student who reaches the last authored lesson is held in
+   place, the server emails `ALERT_EMAIL_TO` through Resend with the category, Band, current
+   lesson, missing sequences, and an opaque hold ID, and the signed `/resume` link re-checks the
+   set later. Adding the next lesson and restarting serves that lesson from the same ticket
+   while the set stays `incomplete`. A set marked `complete` is rejected at startup unless every
+   expected lesson exists.
 
 6. **The signed ticket names an exact catalog lesson, not a path.** Its payload is
    `v0|skill=<category>|level=<irl>|lesson=<catalog-id>|issued=<UTC>|available=<UTC>|nonce=<random>`
@@ -176,8 +179,9 @@ expected lesson, and its runnable lessons must equal the declared set.
 
 1. A stopped session returns the current lesson.
 2. The current lesson must belong to a declared set.
-3. If the set is incomplete, apply `on_incomplete_set`: `hold_and_alert` holds at the frontier,
-   `authored_route` uses the lesson's fallback destination.
+3. If the set is incomplete, apply `on_incomplete_set`. `hold_and_alert` serves the next lesson
+   that exists in the band and holds at the frontier. `authored_route` uses the lesson's fallback
+   destination.
 4. If mastery and a later set exists, go to that set's first expected sequence. If the later set
    is incomplete, hold or enter its first available lesson according to policy.
 5. If no mastery and the current sequence is not last in the set, go to the next expected

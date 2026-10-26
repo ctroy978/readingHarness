@@ -65,6 +65,10 @@ reading review and the AI review pass.
 - [ ] Advance, retry, and stopped destinations are explicit and deterministic.
 - [ ] Every destination exists in the catalog and has the matching `next_irl` grade.
 - [ ] `stopped.next_file` names the current lesson.
+- [ ] The set stays `incomplete` until every expected sequence exists. While it is incomplete, the
+      server walks existing lessons and holds at the last one. `advance` and `retry` are stored
+      fallbacks, not the live path.
+- [ ] `script_overrides.near_copy_2` is present.
 - [ ] Shared thresholds come from `server/config/protocol.json`.
 - [ ] Stop behavior is defined.
 - [ ] Completion token contains the current lesson and counts, not a destination.

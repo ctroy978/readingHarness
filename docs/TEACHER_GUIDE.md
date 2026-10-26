@@ -72,6 +72,8 @@ from the onboarding page, which restarts the pacing window.
 full explanation do not count. The mastery threshold is four `got_there` answers, set in
 `server/config/protocol.json`.
 
+These three rules apply only after the set is marked `complete`:
+
 - With mastery, the student advances to the next stage, or to stage 1 of the next grade.
 - Without mastery, the student gets the next sequence in the same stage.
 - Completing the last lesson in a set without mastery steps down to the middle of the previous
@@ -94,10 +96,12 @@ When `ALERT_EMAIL_TO` is configured, the server sends one email per hold:
 - category, Band, current lesson, and missing sequence numbers
 - an opaque hold ID (no student identity)
 
-To release held students, add the missing lessons, set the set's `status` to `complete` only when
-every expected sequence exists, rebuild, push, and restart. The same hold link then re-evaluates
-and returns the next lesson. A set marked `complete` while lessons are missing is rejected at
-startup, so a bad status takes the whole catalog down.
+To release a held student, add the next lesson in that band, rebuild, push, and restart. Leave
+the set `incomplete` until every expected sequence exists. The same hold link, or the same ticket
+pasted again, then serves that new lesson. Mark the set `complete` only when every expected
+sequence exists. Mastery then leaves the band instead of continuing through the remaining
+sequences. A set marked `complete` while lessons are missing is rejected at startup, so a bad
+status takes the whole catalog down.
 
 ## The ticket is not a grade
 

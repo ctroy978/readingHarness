@@ -117,10 +117,12 @@ The unsigned exit line format is:
 v1|from=vocab_band_5_1_0001|done=5|got_there=4
 ```
 
-The AI prints that line. The student pastes it at `/finish`. The server looks up the current
-lesson's route policy, chooses `advance` or `retry`, and returns a signed `/next` URL containing
-the destination and `available_at`. The one-day clock is set by the server when it signs the line.
-The link cannot be edited to change either the destination or the unlock time.
+The AI prints that line. The student pastes it at `/finish`. The server resolves the next lesson
+from `curriculum.json` and returns a signed `/next` URL containing the destination and
+`available_at`. While the current set is `incomplete`, that destination is the next existing
+lesson in the band, or a hold when the student is already on the last existing lesson. The
+one-day clock is set by the server when it signs the line. The link cannot be edited to change
+either the destination or the unlock time.
 
 This is a pacing gate, not a tamper-proof one-lesson-per-student enforcement system. Without
 server state, a student can still start another progression or copy a link. The server stores no
@@ -200,12 +202,14 @@ does not ask the AI to choose a destination. The AI reports results; the server 
 lesson against the catalog.
 
 Sets marked `incomplete` in `curriculum.json` do not use central progression yet. The default
-`on_incomplete_set` policy is `hold_and_alert`. A student who reaches the last authored lesson in a
-short set is held there; the server emails `ALERT_EMAIL_TO` with the category, Band, current lesson,
-missing sequences, and an opaque hold ID. The student bookmarks the signed hold link and opens the
-same link again later. If the set is still short, the student stays on hold. If the missing lessons
-have been added and the set is marked complete, the same link resumes normal progression. A complete
-set is rejected at startup if any expected lesson is missing.
+`on_incomplete_set` policy is `hold_and_alert`. Finishing a lesson in a short set serves the next
+file that already exists in that band. A student who reaches the last authored lesson is held
+there; the server emails `ALERT_EMAIL_TO` with the category, Band, current lesson, missing
+sequences, and an opaque hold ID. The student bookmarks the signed hold link or pastes the same
+ticket again after the server restarts. If the set is still short, the student stays on hold.
+Adding the next lesson and restarting serves that lesson from the same ticket while the set stays
+`incomplete`. Mark the set `complete` only when every expected sequence exists. Completion turns
+on mastery and step-down. A complete set is rejected at startup if any expected lesson is missing.
 
 ## Deploy
 
