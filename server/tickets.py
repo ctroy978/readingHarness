@@ -22,6 +22,7 @@ class Ticket:
     lesson: Lesson
     issued_at: datetime
     available_at: datetime
+    carry: str = ""
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,12 @@ class Completion:
     done: int
     got_there: int
     stopped: bool
+    unaided: int = 0
+    helped: int = 0
+    mercy: int = 0
+    open: int = 0
+    anchor_failed: bool = False
+    carry: str = ""
 
 
 def _check_lesson(skill: str, level: int, lesson: Lesson | None) -> Lesson:
@@ -48,7 +55,7 @@ def _parse_fields(line: str) -> dict[str, str]:
     if not isinstance(line, str) or len(line) > TICKET_LIMIT:
         raise TicketError("Invalid line")
     parts = line.strip().split("|")
-    if not parts or parts[0] not in {"v0", "v1"}:
+    if not parts or parts[0] not in {"v0", "v1", "v2"}:
         raise TicketError("Invalid line")
     fields: dict[str, str] = {}
     for item in parts[1:]:
@@ -75,9 +82,63 @@ def parse_unsigned_line(line: str, lookup) -> Lesson:
     return lesson
 
 
+CARRY = re.compile(r"^\d+\.\d+\.[01m]{0,3}\.\d+$")
+
+
+def _parse_v2(fields: dict[str, str], lookup, policies) -> Completion:
+    """v2 carries the per-item result split and the rung memory.
+
+    u = items right with no help, h = right after a help, m = right only after
+    tell and a say-back, o = given up. an=0 means an anchor item needed help.
+    """
+    allowed = {"from", "done", "u", "h", "m", "o", "an", "carry", "stop"}
+    if not {"from", "done", "u", "h", "carry"} <= fields.keys() or not fields.keys() <= allowed:
+        raise TicketError("Incomplete line")
+    lesson = lookup(fields["from"])
+    if lesson is None:
+        raise TicketError("Unknown lesson")
+    policy = policies.get(lesson.id)
+    if policy is None:
+        raise TicketError("Lesson has no server routing policy")
+    try:
+        done = int(fields["done"])
+        unaided = int(fields["u"])
+        helped = int(fields["h"])
+        mercy = int(fields.get("m", "0"))
+        given_up = int(fields.get("o", "0"))
+    except ValueError as exc:
+        raise TicketError("Invalid outcome counts") from exc
+    counts = (done, unaided, helped, mercy, given_up)
+    if any(value < 0 for value in counts) or done > policy.item_count:
+        raise TicketError("Invalid outcome counts")
+    if unaided + helped + mercy + given_up != done:
+        raise TicketError("Invalid outcome counts")
+    anchor = fields.get("an", "1")
+    if anchor not in {"0", "1"}:
+        raise TicketError("Invalid anchor value")
+    stop = fields.get("stop")
+    if stop is not None and stop != "1":
+        raise TicketError("Invalid stop value")
+    carry = fields["carry"]
+    if carry != "" and CARRY.fullmatch(carry) is None:
+        raise TicketError("Invalid carry")
+    return Completion(
+        lesson=lesson,
+        done=done,
+        got_there=unaided + helped,
+        stopped=stop == "1",
+        unaided=unaided,
+        helped=helped,
+        mercy=mercy,
+        open=given_up,
+        anchor_failed=anchor == "0",
+        carry=carry,
+    )
+
+
 def parse_completion_line(line: str, lookup, policies) -> Completion:
     parts = line.strip().split("|") if isinstance(line, str) else []
-    if not parts or parts[0] not in {"v1", "v0"}:
+    if not parts or parts[0] not in {"v1", "v0", "v2"}:
         raise TicketError("Invalid line")
     fields = _parse_fields(line)
     if parts[0] == "v0":
@@ -94,6 +155,8 @@ def parse_completion_line(line: str, lookup, policies) -> Completion:
             got_there=0,
             stopped=False,
         )
+    if parts[0] == "v2":
+        return _parse_v2(fields, lookup, policies)
     expected = {"from", "done", "got_there"}
     if not expected <= fields.keys() or not fields.keys() <= expected | {"stop"}:
         raise TicketError("Incomplete line")
@@ -193,13 +256,20 @@ def choose_route(completion: Completion, policy: LessonPolicy, advance_min: int)
     return policy.routes.retry
 
 
-def _payload(lesson: Lesson, issued_at: datetime, available_at: datetime, nonce: str) -> str:
+def _payload(
+    lesson: Lesson,
+    issued_at: datetime,
+    available_at: datetime,
+    nonce: str,
+    carry: str = "",
+) -> str:
     issued = issued_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     available = available_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    return (
+    base = (
         f"v0|skill={lesson.skill}|level={lesson.level}|lesson={lesson.id}|"
         f"issued={issued}|available={available}|nonce={nonce}"
     )
+    return f"{base}|carry={carry}" if carry else base
 
 
 def _sign(payload: str, secret: bytes) -> str:
@@ -212,12 +282,16 @@ def make_ticket(
     secret: bytes,
     issued_at: datetime | None = None,
     available_at: datetime | None = None,
+    carry: str = "",
 ) -> str:
     issued_at = issued_at or datetime.now(timezone.utc)
     issued_at = issued_at.astimezone(timezone.utc).replace(microsecond=0)
     available_at = available_at or issued_at
     available_at = available_at.astimezone(timezone.utc).replace(microsecond=0)
-    return _sign(_payload(lesson, issued_at, available_at, secrets.token_urlsafe(12)), secret)
+    return _sign(
+        _payload(lesson, issued_at, available_at, secrets.token_urlsafe(12), carry),
+        secret,
+    )
 
 
 def verify_ticket(ticket: str, secret: bytes, lookup, now: datetime | None = None) -> Ticket:
@@ -231,11 +305,18 @@ def verify_ticket(ticket: str, secret: bytes, lookup, now: datetime | None = Non
         raise TicketError("Invalid ticket")
 
     parts = payload.split("|")
-    if len(parts) != 7 or parts[0] != "v0":
+    if len(parts) not in {7, 8} or parts[0] != "v0":
         raise TicketError("Invalid ticket")
     prefixes = ("skill=", "level=", "lesson=", "issued=", "available=", "nonce=")
     if any(not part.startswith(prefix) for part, prefix in zip(parts[1:], prefixes)):
         raise TicketError("Invalid ticket")
+    carry = ""
+    if len(parts) == 8:
+        if not parts[7].startswith("carry="):
+            raise TicketError("Invalid ticket")
+        carry = parts[7][len("carry=") :]
+        if carry and CARRY.fullmatch(carry) is None:
+            raise TicketError("Invalid ticket")
     skill = parts[1][len("skill=") :]
     try:
         level = int(parts[2][len("level=") :])
@@ -255,4 +336,6 @@ def verify_ticket(ticket: str, secret: bytes, lookup, now: datetime | None = Non
         raise TicketError("Invalid ticket")
     if available_at < issued_at:
         raise TicketError("Invalid ticket")
-    return Ticket(lesson=lesson, issued_at=issued_at, available_at=available_at)
+    return Ticket(
+        lesson=lesson, issued_at=issued_at, available_at=available_at, carry=carry
+    )

@@ -32,20 +32,26 @@ carry the complete location and pacing state.
    without `.json`, and a present `lesson_id` must equal it.
 
 2. **The server owns route selection.** The AI prints only
-   `v1|from=<lesson_id>|done=<n>|got_there=<n>` (plus `|stop=1` when stopping). The server
-   validates the counts, resolves the destination against `curriculum.json`, and signs the next
-   link. A stopped session returns the current lesson. While the set is `incomplete`, the server
-   serves the next lesson that exists in the band and holds at the last one. It does not follow
-   the compiled `advance` or `retry` fields. The AI never names a destination and never signs.
+   `v2|from=<lesson_id>|done=<n>|u=<n>|h=<n>|m=<n>|o=<n>|an=<0|1>|carry=<state>` (plus `|stop=1`
+   when stopping). The server validates the counts, resolves the destination against
+   `curriculum.json`, and signs the next link, writing the updated `carry` state back into it. A
+   stopped session returns the current lesson. While the set is `incomplete`, the server serves
+   the next lesson that exists in the band and holds at the last one. It does not follow the
+   compiled `advance` or `retry` fields. The AI never names a destination and never signs.
 
 3. **Routing is authored, progression is computed.** Each lesson stores three fallback
    destinations, but in a complete curriculum set the server derives the next lesson from the
    set's `expected_sequences` and the mastery rule. Authored fallbacks decide only when the
    protocol selects the `authored_route` policy for an incomplete set.
 
-4. **Mastery is `got_there >= advance_min_got_there`.** `protocol.json` sets the threshold to 4.
-   `got_there` is `unaided + helped`; mercy and open do not count. A stopped session returns the
-   current lesson and does not move the student.
+4. **A move takes a window, not one lesson.** `protocol.json` sets `routing.window` to
+   `clear` = `unaided >= advance_min_got_there` (4) with the anchor item held. One lesson at 4 of 5
+   is a 0.38-0.96 interval, so a single clear cannot carry a move. The last three results ride in
+   the ticket as `carry`: two clears in that window move the reader up a rung; a hard fail is
+   `unaided + helped <= fail_max_got_there` (3) or a failed anchor, and two of those move the reader
+   to the middle of the previous rung; a second down-move inside the same rung holds for a teacher
+   instead of stepping down again. Mercy and open answers count as neither a clear nor a fail. A
+   stopped session returns the current lesson and does not move the student.
 
 5. **Incomplete sets hold and alert.** `curriculum.json` marks each set `complete` or
    `incomplete`. With the default `hold_and_alert` policy, earlier lessons in a short set still
@@ -57,11 +63,13 @@ carry the complete location and pacing state.
    expected lesson exists.
 
 6. **The signed ticket names an exact catalog lesson, not a path.** Its payload is
-   `v0|skill=<category>|level=<irl>|lesson=<catalog-id>|issued=<UTC>|available=<UTC>|nonce=<random>`
+   `v0|skill=<category>|level=<irl>|lesson=<catalog-id>|issued=<UTC>|available=<UTC>|nonce=<random>|carry=<state>`
    signed with HMAC-SHA256 as `<payload>.<hex digest>`. `skill`, `level`, and `lesson` must agree
-   in the catalog. The server replaces client-supplied time and nonce, so a caller cannot
-   backdate a link or skip the pacing gate. `/sign` is unauthenticated by design; access control
-   is not a goal.
+   in the catalog. `carry` is omitted when empty and is
+   `<stage>.<lessons-finished>.<history>.<downs>`, where history holds up to three symbols,
+   oldest first: `1` clear, `0` hard fail, `m` neither. The server replaces client-supplied time
+   and nonce, so a caller cannot backdate a link or skip the pacing gate. `/sign` is
+   unauthenticated by design; access control is not a goal.
 
 7. **One-day pacing is a norm, not enforcement.** The server stamps `available_at` one day after
    signing, except that a stopped session returns the current lesson immediately. Re-clicking a
@@ -200,14 +208,20 @@ the startup manifest.
 ### 8.1 AI completion line
 
 ```text
-v1|from=<lesson_id>|done=<completed-items>|got_there=<unaided-or-helped>
-v1|from=<lesson_id>|done=<completed-items>|got_there=<unaided-or-helped>|stop=1
+v2|from=<lesson_id>|done=<completed-items>|u=<unaided>|h=<helped>|m=<mercy>|o=<open>|an=<0|1>|carry=<state>
+v2|from=<lesson_id>|done=<completed-items>|u=<unaided>|h=<helped>|m=<mercy>|o=<open>|an=<0|1>|carry=<state>|stop=1
 ```
 
-`from` must be a catalog lesson with a stored route policy. `done` and `got_there` must be
-non-negative integers, `done <= item_count`, and `got_there <= done`. A legacy `v0` line with
-`skill`, `level`, and `lesson` is still accepted, but it has no outcome counts, so it records
-`got_there = 0` and cannot claim mastery.
+`from` must be a catalog lesson with a stored route policy. `done`, `u`, `h`, `m`, and `o` must be
+non-negative integers, `done <= item_count`, and `u + h + m + o == done`; `m` and `o` default to 0.
+`got_there` is derived as `u + h`; the server does not accept it as a separate field. `an=0` means
+an anchor item needed help, which blocks a clear. `carry` is the rung memory, empty on the first
+lesson of a rung or `<stage>.<lessons-finished>.<history>.<downs>` after it.
+
+Legacy `v1` lines (`done` and `got_there` only) and legacy `v0` lines with `skill`, `level`, and
+`lesson` are still accepted. Neither carries the `u`/`h` split or a `carry`, so the window records a
+legacy line as neither a clear nor a fail (`m`): the server has nothing to judge. Every compiled
+lesson emits `v2`, so this only affects a line printed by an older lesson build.
 
 ### 8.2 Signed lesson ticket
 

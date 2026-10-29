@@ -61,7 +61,8 @@ def test_compiler_uses_shared_protocol_and_lesson_overrides(protocol, source):
     assert lesson["script"]["near_copy_2"].startswith("Start with the shelf")
     assert lesson["tutoring_instructions"][-1] == source["instruction_additions"][0]
     assert "q2" in "\n".join(lesson["tutoring_instructions"])
-    assert lesson["rules"]["token_done"].startswith("v1|from={lesson_id}")
+    assert lesson["rules"]["token_done"].startswith("v2|from={lesson_id}")
+    assert "{carry}" in lesson["rules"]["token_done"]
     assert lesson["rules"]["server_routes"]["advance"]["next_file"] == "inference_band_6_1_0001"
     assert lesson["meta"].get("reader") is None
 
@@ -81,7 +82,13 @@ def test_compiler_rejects_unknown_script_override(protocol, source):
 def test_protocol_has_single_source_for_common_instructions(protocol):
     instructions = protocol["instructions"]
     assert len(instructions) == len(set(instructions))
-    assert protocol["tokens"]["done"] == "v1|from={lesson_id}|done={done}|got_there={got_there}"
-    assert json.dumps(protocol["routing"], sort_keys=True) == json.dumps(
-        {"advance_min_got_there": 4}, sort_keys=True
-    )
+    done = protocol["tokens"]["done"]
+    assert done.startswith("v2|from={lesson_id}|done={done}")
+    for field in ("{unaided}", "{helped}", "{mercy}", "{open}", "{anchor}", "{carry}"):
+        assert field in done
+    routing = protocol["routing"]
+    assert routing["advance_min_got_there"] == 4
+    window = routing["window"]
+    assert window["clears_to_move"] == 2
+    assert window["fails_to_move"] == 2
+    assert 1 <= window["size"] <= 3

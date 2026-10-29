@@ -4,6 +4,7 @@ import html
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from urllib.parse import parse_qs, quote
 
 from starlette.applications import Starlette
@@ -89,10 +90,23 @@ def _hold_page(url: str) -> HTMLResponse:
     )
 
 
-def _serve(config: Config, lesson, status_on_missing: int = 404) -> Response | HTMLResponse:
+def _serve(
+    config: Config, lesson, status_on_missing: int = 404, carry: str | None = None
+) -> Response | HTMLResponse:
     content = config.lesson_bytes.get(lesson.filename)
     if content is None:
         return _invalid(status_on_missing)
+    if carry:
+        # The rung memory rides in the signed link, so the served lesson carries
+        # it into the ticket the lesson writes. No server state, no database.
+        doc = json.loads(content)
+        rules = doc.get("rules")
+        if isinstance(rules, dict):
+            for key in ("token_done", "token_stopped"):
+                value = rules.get(key)
+                if isinstance(value, str) and "{carry}" in value:
+                    rules[key] = value.replace("{carry}", carry)
+            content = json.dumps(doc, indent=2, ensure_ascii=True).encode("utf-8")
     return Response(
         content,
         media_type="application/json",
@@ -105,7 +119,7 @@ def _serve(config: Config, lesson, status_on_missing: int = 404) -> Response | H
 
 def _resolve(config: Config, completion) -> ProgressionResult:
     policy = config.policies[completion.lesson.id]
-    routing = config.protocol["routing"]
+    routing: Any = config.protocol["routing"]
     route = choose_route(completion, policy, routing["advance_min_got_there"])
     try:
         return select_next_lesson(
@@ -115,18 +129,21 @@ def _resolve(config: Config, completion) -> ProgressionResult:
             config.protocol["progression"],
             routing["advance_min_got_there"],
             route.next_file,
+            window=routing.get("window"),
+            carry=completion.carry,
         )
     except ProgressionError as exc:
         raise TicketError("Invalid progression") from exc
 
 
-def _next_url(config: Config, lesson, available_at=None) -> str:
+def _next_url(config: Config, lesson, available_at=None, carry: str = "") -> str:
     now = datetime.now(timezone.utc)
     ticket = make_ticket(
         lesson,
         config.secret,
         issued_at=now,
         available_at=available_at or now,
+        carry=carry,
     )
     return f"{config.public_base_url}/next?t={quote(ticket, safe='')}"
 
@@ -146,6 +163,7 @@ def _sign_line(config: Config, line: str) -> str:
         config.secret,
         issued_at=now,
         available_at=available_at,
+        carry=result.carry or completion.carry,
     )
     return f"{config.public_base_url}/next?t={quote(ticket, safe='')}"
 
@@ -261,7 +279,7 @@ def create_app(config: Config | None = None) -> Starlette:
 <p>It will be available <time datetime="{iso}">{html.escape(human)}</time>.</p>
 <p class="note">Bookmark this page. Come back after that time and click the same bookmark.</p>""",
             )
-        return _serve(config, ticket.lesson)
+        return _serve(config, ticket.lesson, carry=ticket.carry)
 
     async def resume(request: Request):
         h = request.query_params.get("h")

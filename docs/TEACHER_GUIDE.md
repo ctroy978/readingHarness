@@ -52,8 +52,13 @@ The lesson is practice, not an assessment of record. The AI does not reveal a ru
 When the lesson ends, the AI prints one unsigned line:
 
 ```text
-v1|from=<lesson_id>|done=<items>|got_there=<items>
+v2|from=<lesson_id>|done=<items>|u=<items>|h=<items>|m=<items>|o=<items>|an=<0|1>|carry=<state>
 ```
+
+`u` is answers right without help, `h` right after a help question, `m` right only after the
+explanation and a say-back, and `o` questions given up. `an=0` means the first question needed
+help. `carry` is the server's memory of the last three lessons; the student copies it exactly and
+never edits it.
 
 The student pastes exactly that line on the finish page. The server validates it, chooses the
 route from the lesson's authored policy and the curriculum manifest, and returns a signed link.
@@ -68,17 +73,22 @@ from the onboarding page, which restarts the pacing window.
 
 ## Progression, mastery, and step-down
 
-`got_there` counts answers the student produced unaided or after help. Mercy answers after a
-full explanation do not count. The mastery threshold is four `got_there` answers, set in
-`server/config/protocol.json`.
+`u + h` are the answers the student produced unaided or after a help question. Mercy answers after a
+full explanation do not count. A clear is four unaided answers with the first question answered
+without help; the threshold is set in `server/config/protocol.json` as `advance_min_got_there`.
+
+The server judges the last three lessons, not the one in front of it, so two clears in three move
+the student up a rung. The three results travel with the student in the signed link (`carry`).
 
 These three rules apply only after the set is marked `complete`:
 
-- With mastery, the student advances to the next stage, or to stage 1 of the next grade.
-- Without mastery, the student gets the next sequence in the same stage.
-- Completing the last lesson in a set without mastery steps down to the middle of the previous
-  set. For an eight-lesson set that is sequence `0004`; the server computes it from the set's
-  `expected_sequences`.
+- With two clears in the last three lessons, the student advances to the next stage, or to stage 1
+  of the next grade.
+- Without them, the student gets the next sequence in the same stage.
+- Two hard fails (three or fewer `u + h`, or a first question that needed help) step down to the
+  middle of the previous set. For an eight-lesson set that is sequence `0004`; the server computes
+  it from the set's `expected_sequences`. A second step-down inside the same rung holds the student
+  for a teacher instead of moving again.
 - From stage 1, the step-down goes to the last authored stage of the grade below.
 - At the bottom of the catalog, the student restarts the band. At the top, the student is held.
 

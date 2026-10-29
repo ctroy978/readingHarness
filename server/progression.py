@@ -13,10 +13,44 @@ class ProgressionError(ValueError):
 
 
 @dataclass(frozen=True)
+class Carry:
+    """The rung memory a stateless server cannot remember for itself.
+
+    stage  - the authored stage the memory belongs to
+    n      - lessons finished in this rung
+    hist   - up to three results, oldest first: 1 clear, 0 hard fail, m neither
+    downs  - consecutive down-moves, so a third cannot happen
+    """
+
+    stage: int = 0
+    n: int = 0
+    hist: str = ""
+    downs: int = 0
+
+    @classmethod
+    def parse(cls, text: str | None) -> "Carry":
+        if not text:
+            return cls()
+        parts = text.split(".")
+        if len(parts) != 4:
+            return cls()
+        stage, n, hist, downs = parts
+        if not stage.isdigit() or not n.isdigit() or not downs.isdigit():
+            return cls()
+        if len(hist) > 3 or set(hist) - set("01m"):
+            return cls()
+        return cls(int(stage), int(n), hist, int(downs))
+
+    def text(self) -> str:
+        return f"{self.stage}.{self.n}.{self.hist}.{self.downs}"
+
+
+@dataclass(frozen=True)
 class ProgressionResult:
     lesson: Lesson | None
     hold_reason: str | None = None
     hold_set: "LessonSet | None" = None
+    carry: str | None = None
 
     @property
     def grade(self) -> int | None:
@@ -208,6 +242,103 @@ def _incomplete_action(
     return ProgressionResult(None, "current_set_frontier", current_set)
 
 
+def _windowed(
+    completion: Completion,
+    current_set: LessonSet,
+    ordered: tuple[LessonSet, ...],
+    index: int,
+    lessons: Mapping[str, Lesson],
+    settings: Mapping[str, Any],
+    advance_min: int,
+    window: Mapping[str, Any],
+    carry_text: str,
+) -> ProgressionResult:
+    """Decide a move from the last three lessons, not from this one.
+
+    A single lesson at 4 of 5 is a 0.38-0.96 interval, so one clear cannot carry
+    a move. The rung holds its own history in the signed continuation.
+    """
+    carry = Carry.parse(carry_text)
+    if carry.stage != current_set.stage:
+        carry = Carry(current_set.stage, 0, "", 0)
+
+    fail_at = int(window.get("fail_max_got_there", 3))
+    need = int(window.get("clears_to_move", 2))
+    fails = int(window.get("fails_to_move", 2))
+
+    hard_fail = completion.unaided + completion.helped <= fail_at or completion.anchor_failed
+    clears = completion.unaided >= advance_min and not completion.anchor_failed
+    split = completion.unaided + completion.helped + completion.mercy + completion.open
+    if split != completion.done:
+        # A legacy v1 or v0 line has no result split, so the window has nothing to
+        # judge. Count it as neither a clear nor a fail rather than punishing the
+        # reader for the server's old format.
+        symbol = "m"
+    else:
+        symbol = "1" if clears else ("0" if hard_fail else "m")
+
+    history = (carry.hist + symbol)[-3:]
+    n = carry.n + 1
+    state = Carry(current_set.stage, n, history, carry.downs)
+    sequences = list(current_set.expected_sequences)
+
+    def target(set_, sequence):
+        return _target(
+            _lesson_id(set_.skill, set_.grade, set_.stage, sequence), lessons
+        )
+
+    def unused_sequence() -> int | None:
+        if n < len(sequences):
+            return sequences[n]
+        return None
+
+    def push_back(reason: str) -> ProgressionResult:
+        if settings.get("on_floor") != "restart_set":
+            return ProgressionResult(None, reason, current_set, state.text())
+        sequence = unused_sequence()
+        if sequence is None:
+            return ProgressionResult(None, "rung_exhausted", current_set, state.text())
+        return ProgressionResult(
+            target(current_set, sequence),
+            carry=state.text(),
+        )
+
+    if history.count("1") >= need:
+        if index + 1 >= len(ordered):
+            return ProgressionResult(None, "ceiling", current_set, state.text())
+        following = ordered[index + 1]
+        if not following.complete:
+            # Never move into a set that is not finished: the ladder has a gap.
+            return ProgressionResult(None, "next_set_incomplete", following, state.text())
+        return ProgressionResult(
+            target(following, following.first_sequence),
+            carry=Carry(following.stage, 0, "", 0).text(),
+        )
+
+    if history.count("0") >= fails:
+        if state.downs >= 1:
+            return ProgressionResult(None, "two_down_moves", current_set, state.text())
+        state = Carry(current_set.stage, n, history, state.downs + 1)
+        if index > 0:
+            previous = ordered[index - 1]
+            if not previous.complete:
+                return ProgressionResult(None, "previous_set_incomplete", previous, state.text())
+            return ProgressionResult(
+                target(previous, previous.middle_sequence),
+                carry=Carry(previous.stage, 0, "", 0).text(),
+            )
+        return push_back("floor")
+
+    if completion.lesson.sequence in sequences:
+        position = sequences.index(completion.lesson.sequence)
+        if position + 1 < len(sequences):
+            return ProgressionResult(
+                target(current_set, sequences[position + 1]),
+                carry=state.text(),
+            )
+    return push_back("rung_end_stay")
+
+
 def select_next_lesson(
     completion: Completion,
     curriculum: Curriculum,
@@ -215,9 +346,11 @@ def select_next_lesson(
     settings: Mapping[str, Any],
     advance_min: int,
     fallback_file: str,
+    window: Mapping[str, Any] | None = None,
+    carry: str = "",
 ) -> ProgressionResult:
     if completion.stopped:
-        return ProgressionResult(completion.lesson)
+        return ProgressionResult(completion.lesson, carry=carry)
 
     current = completion.lesson
     current_set = curriculum.get(current.skill, current.irl, current.stage)
@@ -238,6 +371,19 @@ def select_next_lesson(
             settings,
             lessons,
             advance_min,
+        )
+
+    if window is not None:
+        return _windowed(
+            completion,
+            current_set,
+            ordered,
+            index,
+            lessons,
+            settings,
+            advance_min,
+            window,
+            carry,
         )
 
     if mastered:

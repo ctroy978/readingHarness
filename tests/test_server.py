@@ -536,3 +536,36 @@ def test_dotenv_supplies_github_settings(tmp_path: Path, monkeypatch: pytest.Mon
     config = load_config()
     assert config.lesson("vocab_band_5_1_0001") is not None
     assert config.lesson_bytes["vocab_band_5_1_0001.json"].startswith(b"{")
+
+
+def test_carry_rides_into_the_served_lesson(client, config):
+    lesson = config.lessons["inference_band_5_1_0001"]
+    document = _lesson_data(lesson.id)
+    document["rules"]["token_done"] = (
+        "v2|from={lesson_id}|done={done}|carry={carry}"
+    )
+    lesson_bytes = dict(config.lesson_bytes)
+    lesson_bytes[f"{lesson.id}.json"] = json.dumps(document).encode()
+    served = replace(config, lesson_bytes=MappingProxyType(lesson_bytes))
+
+    ticket = make_ticket(lesson, served.secret, carry="1.2.1m.0")
+    response = AsgiClient(create_app(served)).get(f"/next?t={ticket}")
+
+    assert response.status_code == 200
+    assert response.json()["rules"]["token_done"].endswith("carry=1.2.1m.0")
+
+
+def test_a_ticket_without_carry_serves_the_template_untouched(client, config):
+    lesson = config.lessons["inference_band_5_1_0001"]
+    document = _lesson_data(lesson.id)
+    document["rules"]["token_done"] = (
+        "v2|from={lesson_id}|done={done}|carry={carry}"
+    )
+    lesson_bytes = dict(config.lesson_bytes)
+    lesson_bytes[f"{lesson.id}.json"] = json.dumps(document).encode()
+    served = replace(config, lesson_bytes=MappingProxyType(lesson_bytes))
+
+    ticket = make_ticket(lesson, served.secret)
+    response = AsgiClient(create_app(served)).get(f"/next?t={ticket}")
+
+    assert response.json()["rules"]["token_done"].endswith("carry={carry}")

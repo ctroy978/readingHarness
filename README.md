@@ -114,15 +114,17 @@ Rules:
 The unsigned exit line format is:
 
 ```text
-v1|from=vocab_band_5_1_0001|done=5|got_there=4
+v2|from=vocab_band_5_1_0001|done=5|u=4|h=1|m=0|o=0|an=1|carry=
 ```
 
 The AI prints that line. The student pastes it at `/finish`. The server resolves the next lesson
-from `curriculum.json` and returns a signed `/next` URL containing the destination and
-`available_at`. While the current set is `incomplete`, that destination is the next existing
-lesson in the band, or a hold when the student is already on the last existing lesson. The
-one-day clock is set by the server when it signs the line. The link cannot be edited to change
-either the destination or the unlock time.
+from `curriculum.json` and returns a signed `/next` URL containing the destination,
+`available_at`, and the updated `carry` state. A move needs two clears among the last three
+lessons, so the link also carries the result of this lesson. `carry` is empty on the first lesson
+of a rung and grows as the student works through it. While the current set is `incomplete`,
+that destination is the next existing lesson in the band, or a hold when the student is already on
+the last existing lesson. The one-day clock is set by the server when it signs the line. The link
+cannot be edited to change the destination, the unlock time, or the carried history.
 
 This is a pacing gate, not a tamper-proof one-lesson-per-student enforcement system. Without
 server state, a student can still start another progression or copy a link. The server stores no
