@@ -40,7 +40,8 @@ send students a direct URL to `_0002` or later; those sequences are not entry po
 
 1. The student uploads the JSON file to the AI chat.
 2. They type `begin`. The AI replies with only the ready line.
-3. They type `yes` to start. The AI shows the first passage part and the first question.
+3. They type `read` to start. The AI shows the first passage part and the first question.
+   `yes`, `ok`, or `start` also open the lesson; `not yet` declines it.
 4. The student answers one question at a time. A wrong answer stays on the same question through
    the authored help ladder and explanation.
 5. To stop early, the student asks to stop and confirms. The AI prints a stopped ticket.
