@@ -4,7 +4,8 @@
     {"key": "4.1", "label": "Band 4.1", "entries": {
       "inference": "inference_band_4_1_0001",
       "main_idea": "main_idea_band_4_1_0001",
-      "vocab": "vocab_band_4_1_0001"
+      "vocab": "vocab_band_4_1_0001",
+      "text_structure": "text_structure_band_4_1_0001"
     }},
     {"key": "5.1", "label": "Band 5.1", "entries": {
       "inference": "inference_band_5_1_0001"
