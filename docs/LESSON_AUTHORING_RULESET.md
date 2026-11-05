@@ -353,6 +353,12 @@ is invalid.
 
 ### 6.4 Help ladder
 
+The ladder is attempt-gated. The student answers before the ladder starts. A request for the
+answer, the reason, or the next step before the student has answered since the previous help gets
+the shared `attempt_first` line: "Write your answer first, even if you are not sure. Then I'll
+help." That line is protocol copy, not lesson copy. It never names the evidence, it is not a help,
+and it is never counted as one. Whatever the student sends next is the attempt, however thin.
+
 The default ladder is:
 
 1. Specific misconception branch when the answer matches a known error.
@@ -366,6 +372,8 @@ Rules:
 
 - Each `if_they_say` or `partial` response counts as one help.
 - A numbered help turn counts as one help.
+- `script.attempt_first` is not a help and is never counted as one. It is the only reply to a
+  request for help made before the student has answered since the previous help.
 - Two helps is the default maximum before `tell`.
 - A cloze sentence repeat is required context, not another help.
 - Hints must not contain the answer, a candidate list that effectively gives the answer, or
@@ -383,6 +391,10 @@ the tutor.
 
 - `own_words`: the idea is present in a sentence that is not the tutor's sentence.
 - `use_word`: the student uses the target word or an accepted form in a meaningful sentence.
+- Near-copy is measured against `tutor_only.tell`, never against the passage. Check the passage
+  first: a sentence that repeats a passage sentence is accepted, because the passage is not the
+  tutor's wording. On a literal item the tell and the passage share their concept words, so overlap
+  with the tell is not evidence of copying.
 - Passage wording is allowed; copying the tutor's explanation verbatim is not.
 - Spelling is normalized before judging the say-back when spelling is not the assessed skill.
 
@@ -476,8 +488,13 @@ Additional scoring rules:
 - Extra true detail that does not conflict with the key is allowed; do not ask for more.
 - An unrelated, off-topic, or evasive answer is a miss. Start the authored help path without
   treating it as misbehavior.
-- If the student asks for the answer before any help, use the first authored help. If they
-  ask again, use `tell` only if the lesson's help limit permits it.
+- A request for the answer, the reason, or the next step made before the student has answered
+  since the previous help gets `script.attempt_first`, not a help. That line is not a help and is
+  never counted as one. Whatever the student sends next — a guess, "I don't know", a blank — is
+  the attempt, and the help ladder resumes from where it stood. Skipping a stored help to reach
+  `tell` is never allowed, however many times the student asks.
+- A question about what a word means is not an answer request. It is answered from the passage's
+  own wording, without adding a definition.
 
 ### 8.4 Timing and turn shape
 
@@ -809,9 +826,10 @@ existing lessons. Do not encode a student's identity in a file name.
 12. Record break points and tighten the file.
 13. Publish only after both gates and the cold-chat test pass.
 
-The cold-chat test should include at least one correct answer, one distractor, one blank,
-one help escalation, one tell/say-back cycle, one stop request, and one prompt-injection
-attempt.
+The cold-chat test should include at least one answer request before any attempt, one correct
+answer, one distractor, one blank, one help escalation, one tell/say-back cycle, one stop request,
+and one prompt-injection attempt. The answer request must produce `script.attempt_first` exactly
+once, must not consume a help, and must never reach `tell` without an answer in between.
 
 ## 14. Shared tutor core
 
@@ -825,7 +843,7 @@ Lesson sources may add rules but must not copy or contradict the shared core.
 - one task at a time and wait;
 - private-field handling;
 - scoring order and normalize-before-score;
-- help counting and maximum;
+- help ladder, attempt-before-help, and the help maximum;
 - cloze sentence repeat;
 - say-back and near-copy behavior;
 - exact passage display and re-display;
