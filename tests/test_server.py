@@ -71,6 +71,7 @@ def config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         json.dumps(
             {
                 "irl_rows": [
+                    {"key": "3.1", "label": "Band 3.1", "entries": {}},
                     {
                         "key": "5.1",
                         "label": "Band 5.1",
@@ -293,6 +294,18 @@ def test_unavailable_irl_and_type_combination(client):
     assert response.status_code == 200
     assert "Lesson not available" in response.text
     assert client.get("/start?band=missing&skill=vocab").status_code == 400
+
+
+def test_band_with_no_entries_is_not_offered(client):
+    page = client.get("/")
+    assert page.status_code == 200
+    assert "Band 3.1" not in page.text
+    assert "Band 5.1" in page.text
+    # The empty floor band stays reachable by URL so a signed down-move still resolves it,
+    # and it answers honestly rather than serving nothing.
+    floor = client.get("/start?band=3.1&skill=vocab")
+    assert floor.status_code == 200
+    assert "Lesson not available" in floor.text
 
 
 def test_start_uses_lowest_numeric_sequence(client):

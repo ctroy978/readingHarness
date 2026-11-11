@@ -195,9 +195,13 @@ def create_app(config: Config | None = None) -> Starlette:
     config = config or load_config()
 
     async def onboarding(request: Request) -> HTMLResponse:
+        # Only bands that serve at least one lesson are offered. The floor band (3.1) stays
+        # declared in onboarding.json with empty entries: it is reachable by a signed down-move
+        # and must never be offered as a starting point.
         band_options = "".join(
             f'<option value="{html.escape(row.key, quote=True)}">{html.escape(row.label)}</option>'
             for row in config.irl_rows
+            if row.entries
         )
         type_options = "".join(
             f'<option value="{html.escape(category.key, quote=True)}">{html.escape(category.label)}</option>'
