@@ -304,9 +304,22 @@ def test_wait_page_renders_in_pacific_time(config):
     )
     response = AsgiClient(create_app(config)).get(f"/next?t={quote(ticket, safe='')}")
     assert response.status_code == 200
-    assert "Not yet" in response.text
+    assert "Not ready yet." in response.text
     assert " PST<" in response.text or " PDT<" in response.text
     assert "UTC" not in response.text
+
+
+def test_wait_page_is_named_for_a_bookmark(config):
+    lesson = config.lesson("inference_band_5_1_0001")
+    now = datetime.now(timezone.utc)
+    ticket = make_ticket(
+        lesson, config.secret, issued_at=now, available_at=now + timedelta(days=1)
+    )
+    response = AsgiClient(create_app(config)).get(f"/next?t={quote(ticket, safe='')}")
+    # The browser titles a bookmark from <title>, so "Not yet" cannot be the title.
+    assert "<title>Next lesson — reading-harness</title>" in response.text
+    assert "<h1>Your next lesson</h1>" in response.text
+    assert "<title>Not yet" not in response.text
 
 
 def test_band_with_no_entries_is_not_offered(client):

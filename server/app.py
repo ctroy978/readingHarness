@@ -35,10 +35,19 @@ button{font:inherit;padding:.55rem 1rem;margin-top:1rem}
 """.strip()
 
 
-def _page(title: str, body: str) -> HTMLResponse:
+APP_NAME = "reading-harness"
+
+
+def _page(title: str, body: str, heading: str | None = None) -> HTMLResponse:
+    """Render a page.
+
+    The browser takes the bookmark name from <title>, so the title names the
+    destination and carries the app name. The visible heading can say something
+    else, which matters on a page a reader is told to bookmark and come back to.
+    """
     document = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)}</title>
-<style>{STYLE}</style></head><body><h1>{html.escape(title)}</h1>{body}</body></html>"""
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)} — {APP_NAME}</title>
+<style>{STYLE}</style></head><body><h1>{html.escape(heading or title)}</h1>{body}</body></html>"""
     return HTMLResponse(document)
 
 
@@ -278,10 +287,11 @@ def create_app(config: Config | None = None) -> Starlette:
             human = local.strftime("%A, %B %d, %Y at %I:%M %p %Z").replace(" 0", " ")
             iso = available.strftime("%Y-%m-%dT%H:%M:%SZ")
             return _page(
-                "Not yet",
-                f"""<p>Your next lesson isn't ready yet.</p>
+                "Next lesson",
+                f"""<p>Not ready yet.</p>
 <p>It will be available <time datetime="{iso}">{html.escape(human)}</time>.</p>
 <p class="note">Bookmark this page. Come back after that time and click the same bookmark.</p>""",
+                heading="Your next lesson",
             )
         return _serve(config, ticket.lesson, carry=ticket.carry)
 
