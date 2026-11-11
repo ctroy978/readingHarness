@@ -7,7 +7,8 @@
       "vocab": "vocab_band_4_1_0001",
       "text_structure": "text_structure_band_4_1_0001",
       "argument_evidence": "argument_evidence_band_4_1_0001",
-      "literary_text": "literary_text_band_4_1_0001"
+      "literary_text": "literary_text_band_4_1_0001",
+      "authors_craft": "authors_craft_band_4_1_0001"
     }},
     {"key": "5.1", "label": "Band 5.1", "entries": {
       "inference": "inference_band_5_1_0001"
