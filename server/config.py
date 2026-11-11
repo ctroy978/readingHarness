@@ -189,7 +189,7 @@ def load_config() -> Config:
         raise RuntimeError("PUBLIC_BASE_URL must be an absolute http or https URL")
 
     try:
-        display_timezone = ZoneInfo(os.environ.get("DISPLAY_TIMEZONE", "UTC"))
+        display_timezone = ZoneInfo(os.environ.get("DISPLAY_TIMEZONE", "America/Los_Angeles"))
     except ZoneInfoNotFoundError as exc:
         raise RuntimeError("DISPLAY_TIMEZONE is not a known timezone") from exc
 

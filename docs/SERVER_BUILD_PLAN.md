@@ -124,7 +124,7 @@ working directory, then the process environment; existing environment values win
 | `GITHUB_LESSON_PATH` | Optional directory inside the repository. Production uses `lessons`. |
 | `LESSON_DIR` | Optional local development fallback when `GITHUB_REPO` is unset. |
 | `PUBLIC_BASE_URL` | Required in deployment. Absolute base URL for signed links; falls back to `RENDER_EXTERNAL_URL` and then `http://127.0.0.1:8000`. |
-| `DISPLAY_TIMEZONE` | Optional IANA timezone for the wait page. Defaults to `UTC`. |
+| `DISPLAY_TIMEZONE` | Optional IANA timezone for the wait page. Defaults to `America/Los_Angeles` (Pacific). |
 | `CONFIG_DIR` | Optional. Defaults to `server/config`. |
 | `RESEND_API_KEY`, `RESEND_FROM`, `ALERT_EMAIL_TO` | Optional. Enable curriculum-gap email. Alerts are skipped when unset. |
 | `RESEND_REPLY_TO` | Optional reply address on gap alerts. |

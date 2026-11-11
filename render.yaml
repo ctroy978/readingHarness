@@ -20,7 +20,7 @@ services:
       - key: GITHUB_LESSON_PATH
         value: lessons
       - key: DISPLAY_TIMEZONE
-        value: UTC
+        value: America/Los_Angeles
       - key: RESEND_API_KEY
         sync: false
       - key: RESEND_FROM

@@ -9,7 +9,7 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import MappingProxyType
-from urllib.parse import unquote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 import pytest
 
@@ -294,6 +294,19 @@ def test_unavailable_irl_and_type_combination(client):
     assert response.status_code == 200
     assert "Lesson not available" in response.text
     assert client.get("/start?band=missing&skill=vocab").status_code == 400
+
+
+def test_wait_page_renders_in_pacific_time(config):
+    lesson = config.lesson("inference_band_5_1_0001")
+    now = datetime.now(timezone.utc)
+    ticket = make_ticket(
+        lesson, config.secret, issued_at=now, available_at=now + timedelta(days=1)
+    )
+    response = AsgiClient(create_app(config)).get(f"/next?t={quote(ticket, safe='')}")
+    assert response.status_code == 200
+    assert "Not yet" in response.text
+    assert " PST<" in response.text or " PDT<" in response.text
+    assert "UTC" not in response.text
 
 
 def test_band_with_no_entries_is_not_offered(client):

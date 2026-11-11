@@ -28,7 +28,7 @@ Configuration:
 | `GITHUB_LESSON_PATH` | Optional directory inside the repository. Empty means repository root. |
 | `LESSON_DIR` | Optional local lesson directory for development. Used only when `GITHUB_REPO` is unset. |
 | `PUBLIC_BASE_URL` | Required in deployment. Absolute base URL used in signed links. |
-| `DISPLAY_TIMEZONE` | Optional IANA timezone for the wait page. Defaults to `UTC`. |
+| `DISPLAY_TIMEZONE` | Optional IANA timezone for the wait page. Defaults to `America/Los_Angeles` (Pacific). |
 | `CONFIG_DIR` | Optional. Defaults to `server/config`. |
 | `RESEND_API_KEY` | Optional. Resend API key for curriculum-gap email alerts. |
 | `RESEND_FROM` | Optional. Verified Resend sender for curriculum-gap alerts. |
