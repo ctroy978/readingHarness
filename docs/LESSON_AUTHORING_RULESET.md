@@ -246,9 +246,13 @@ readability score.
 
 ### 5.3 Passage display
 
-Each item declares `show_part` as a passage key, `all`, or `null`. The tutor shows the referenced
-part exactly once unless the item sets `show_part_again: true`. Use that flag when the item
-depends on text the student may no longer have in view.
+Each item declares `show_part` as a passage key, `all`, or `null`. The compiler materializes the
+display: every compiled item carries a `display` block (`lead`, `label`, `text`) holding the exact
+passage text to print before its prompt, or an empty `text` when that part is already on screen.
+The tutor prints the block verbatim; it never decides for itself which part it has shown. An item
+that opens a passage part after the first sets `show_part_again: true` as well, so the intent is
+visible in the source. Use that flag on any item that depends on text the student may no longer
+have in view.
 
 Use `show_part: "all"` only for a whole-passage item. It reprints every passage part in order under
 one passage label before the prompt. It is not a shortcut for a question that needs one part.

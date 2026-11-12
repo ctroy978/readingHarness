@@ -69,6 +69,35 @@ def _route(
     }
 
 
+def _attach_displays(result: dict[str, Any], scripts: Mapping[str, str]) -> None:
+    """Write the exact passage block each item must print before its prompt.
+
+    The tutor should not have to remember which passage part it already showed, and a
+    dropped recollection used to leave the student facing a question about text never
+    displayed. The compiler knows the item order and each item's show_part, so it
+    materializes the display next to the prompt: lead line, label, text. An empty text
+    means print no passage at all.
+    """
+    passage = result["passage"]
+    shown: set[str] = set()
+    for item in result["items"]:
+        part = item.get("show_part")
+        repeat = bool(item.get("show_part_again"))
+        lead = text = label = ""
+        if part == "all":
+            label = scripts.get("passage_label", "")
+            text = "\n\n".join(str(value) for value in passage.values())
+        elif isinstance(part, str) and part in passage:
+            label = scripts.get("passage_label", "")
+            if repeat or part not in shown:
+                text = str(passage[part])
+                if shown:
+                    lead = scripts.get("rest_of_passage", "")
+        if isinstance(part, str) and part != "all":
+            shown.add(part)
+        item["display"] = {"lead": lead, "label": label, "text": text}
+
+
 def compile_lesson(source: Mapping[str, Any], protocol: Mapping[str, Any]) -> dict[str, Any]:
     if source.get("schema_version") != 3 or source.get("document_type") != "lesson_source":
         raise LessonBuildError("Lesson source must use schema_version 3 and lesson_source")
@@ -133,6 +162,8 @@ def compile_lesson(source: Mapping[str, Any], protocol: Mapping[str, Any]) -> di
         raise LessonBuildError(f"Unknown script overrides: {sorted(unknown)}")
     scripts.update(overrides)
     result["script"] = scripts
+
+    _attach_displays(result, scripts)
 
     instructions = [
         line.replace("{last_item}", item_ids[-1]) for line in protocol["instructions"]
