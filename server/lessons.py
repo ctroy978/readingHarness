@@ -155,6 +155,7 @@ def compile_lesson(source: Mapping[str, Any], protocol: Mapping[str, Any]) -> di
     tokens = protocol["tokens"]
     result["rules"] = {
         "got_there_means": "unaided plus helped. Mercy does not count as got_there.",
+        "carry": "",
         "results": copy.deepcopy(protocol["results"]),
         "server_routes": {
             "advance": routes,
