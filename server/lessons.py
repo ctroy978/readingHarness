@@ -79,7 +79,7 @@ def _attach_displays(result: dict[str, Any], scripts: Mapping[str, str]) -> None
     means print no passage at all.
     """
     passage = result["passage"]
-    shown: set[str] = set()
+    current: str | None = None  # what the student can actually see right now
     for item in result["items"]:
         part = item.get("show_part")
         repeat = bool(item.get("show_part_again"))
@@ -87,14 +87,16 @@ def _attach_displays(result: dict[str, Any], scripts: Mapping[str, str]) -> None
         if part == "all":
             label = scripts.get("passage_label", "")
             text = "\n\n".join(str(value) for value in passage.values())
+            current = "all"
         elif isinstance(part, str) and part in passage:
             label = scripts.get("passage_label", "")
-            if repeat or part not in shown:
+            # text is needed whenever that part is not the one on screen. An earlier item
+            # having shown it does not help: the next item replaced it.
+            if repeat or part != current:
                 text = str(passage[part])
-                if shown:
+                if current:
                     lead = scripts.get("rest_of_passage", "")
-        if isinstance(part, str) and part != "all":
-            shown.add(part)
+            current = part
         item["display"] = {"lead": lead, "label": label, "text": text}
 
 
