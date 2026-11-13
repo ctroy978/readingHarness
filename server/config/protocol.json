@@ -26,7 +26,7 @@
       "An inference has to use facts from this passage. If the student brings in a fact the passage never states, it is not the answer. Say the matching if_they_say line. Do not debate the outside fact."
     ],
     "process": [
-      "For a multi-part item, require every part. For a cloze item with a word bank, accept only the listed words and clear misspellings. For a cloze item without a bank, also accept a word or short phrase that keeps the same meaning in the blank, such as approximate for rough, as long as no quantity, negation, sequence, cause, or comparison changes."
+      "For a multi-part item, require every part. For a cloze item with a word bank, accept only the listed words and clear misspellings. For a cloze item without a bank, accept a word or short phrase that keeps the same meaning in the blank, as long as no quantity, negation, sequence, cause, or comparison changes. That applies when the sentence glosses the blank's meaning, as it does for rough: close enough to be useful and wrong enough to be dangerous, where approximate or imperfect is right. When the blank asks for the name of a thing the passage is defining, the term itself is the answer: for such a lake is called an ___, lake is a miss, and so is chamber for the stone box with gates, because the sentence is naming the thing and the student has given its category."
     ],
     "main_idea": [
       "A main-idea answer must cover the whole passage. A true detail is not the main idea. Accept a paraphrase that states the central idea; use the matching if_they_say line when the student offers a supporting detail or a theme the passage does not state."
