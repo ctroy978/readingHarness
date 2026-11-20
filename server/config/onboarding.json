@@ -30,7 +30,8 @@
       "key": "5.1",
       "label": "Band 5.1",
       "entries": {
-        "inference": "inference_band_5_1_0001"
+        "inference": "inference_band_5_1_0001",
+        "main_idea": "main_idea_band_5_1_0001"
       }
     },
     {
